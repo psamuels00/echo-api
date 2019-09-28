@@ -27,6 +27,6 @@ test('http://127.0.0.1:5000/samples/id:74/material:wood?_response=200 text:{ "id
 
 # Response File
 test('http://127.0.0.1:5000/samples/id:74/material:wood?_response=200 file:samples/get/{id}.json',
-    200, Template('samples/get/74.json', is_file=True).resolve(dict(id=74, material='wood')))
+    200, Template(file='samples/get/74.json').resolve(dict(id=74, material='wood')))
 
 

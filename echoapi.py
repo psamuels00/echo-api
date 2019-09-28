@@ -52,9 +52,9 @@ param_pat = re.compile('^(\w+):(.*)$')
 
 class Template:
 
-    def __init__(self, value, is_file=False):
-        self.value = value
-        self.is_file = is_file
+    def __init__(self, text=None, file=None):
+        self.text = text
+        self.file = file
 
     def double_braces(self, string, reverse=False):
         if reverse:
@@ -75,18 +75,16 @@ class Template:
     def load_file(self, file):
         path = os.path.join('responses', file)
         with open(path, 'r') as fh:
-            content = fh.read()
-        return content
+            text = fh.read()
+        return text
 
     def resolve(self, params):
-        value = self.value
-        if self.is_file:
-            value = self.resolve_value(value, params)
-            content = self.load_file(value)
+        if self.file:
+            file = self.resolve_value(self.file, params)
+            text = self.load_file(file)
         else:
-            content = value
-
-        return self.resolve_value(content, params)
+            text = self.text
+        return self.resolve_value(text, params)
 
 
 class EchoServer:
@@ -121,8 +119,8 @@ class EchoServer:
             self.status_code = int(self._response)
 
     def response(self):
-        is_file = self.location == 'file'
-        temp = Template(self.value, is_file)
+        args = { self.location: self.value }
+        temp = Template(**args)
         content = temp.resolve(self.params)
         return content, self.status_code
 
