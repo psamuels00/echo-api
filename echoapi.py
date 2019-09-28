@@ -4,21 +4,20 @@
 #
 # Static Response
 #     Return the same static response to all requests
-#     eg: http://127.0.0.1:5000/samples/45?_response=200 { "id": 45, "validation_date": null }
+#     eg: http://127.0.0.1:5000/samples/45?_response=200 text:{ "id": 45, "validation_date": null }
 #
 # Named Parameters
 #     Recognize multiple, named parameters in the url and render them in the response
-#     eg: http://127.0.0.1:5000/samples/id:{id}/other:{other}?_response=200 { "id": {id}, "validation_date": null, "other": "{other}" }
+#     eg: http://127.0.0.1:5000/samples/id:{id}/other:{other}?_response=200 text:{ "id": {id}, "validation_date": null, "other": "{other}" }
 #
 # Response Files
 #     Allow response to come from a file (or URL?) treated as a template wrt the named parameters.
 #     str.format(**data) may be sufficient as the templating system.
-#     eg: http://127.0.0.1:5000/samples/{id}?_response_file=200 samples/get/response.json
+#     eg: http://127.0.0.1:5000/samples/id:{id}?_response=200 file:samples/get/response.json
 #
-# TODO Map of Responses
-#     Allow template file to contain a map of responses keyed by the value of one or more named parameters.
-#     It might be better to keep the response files simple and make the recognized options explicit in the file system.
-#     eg: http://127.0.0.1:5000/samples/{id}?_response_file=200 samples/get/{id}/response.json
+# Map of Responses
+#     Allow response file to be selected by one or more named parameters.
+#     eg: http://127.0.0.1:5000/samples/id:{id}?_response=200 file:samples/get/{id}.json
 #
 # TODO Other Parameters
 #     Add a way to capture parameters other than those in the request path that can be used to select and/or resolve the response
@@ -29,6 +28,7 @@
 #
 # TODO
 # - add error checking
+# - possibly add option to simulate errors, like HTTP status code 400, 500
 
 
 from flask import Flask, request
