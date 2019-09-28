@@ -6,8 +6,8 @@
 #     Return the same static response to all requests
 #     eg: http://127.0.0.1:5000/samples/45?_response=200 text:{ "id": 45, "validation_date": null }
 #
-# Named Parameters
-#     Recognize multiple, named parameters in the url and render them in the response
+# Named Path Parameters
+#     Recognize multiple, named parameters in the url path and render them in the response
 #     eg: http://127.0.0.1:5000/samples/id:{id}/other:{other}?_response=200 text:{ "id": {id}, "validation_date": null, "other": "{other}" }
 #
 # Response Files
@@ -20,22 +20,40 @@
 #     eg: http://127.0.0.1:5000/samples/id:{id}?_response=200 file:samples/get/{id}.json
 #
 # TODO Other Parameters
-#     Add a way to capture parameters other than those in the request path that can be used to select and/or resolve the response
-#     template.  This includes URL parameters supplied in addition to _response and values inside json in the request body.
+#     Capture parameters other than those in the request path that may be used to resolve and/or select
+#     (see Matching Rules) the response template.  This includes URL parameters supplied in addition to
+#     _response and values inside json in the request body.
 #
-#     Use these prefixes, where ellipses indicate a regex and the inline text for "text:" ends on the first blank line.
-#         json.pet.dog.name[...](text|file):...
-#         param.foo[...](text|file):...
-#         path[...](text|file):...
-#         (text|file):...
+# TODO Matching Rules
+#     Allow response content to be selected based on regex matching of the path, parameters, or
+#     an value in the JSON body of a request.  This allows for more flexible response variability
+#     than simple mapping of response files based on the value of a parameter being in the path
+#     to the file (see Map of Responses).  Rules have the following format:
 #
-#     If a match is made on json.pet.dog.name, the response can include {pet.dog.name}.
-#     If a match is made on param.foo, the response can include {foo}.
-#     In both cases, the parameters may be used to select a file using "file:".
+#         PATH:/.../(text|file):...
+#         PARAM:foo/.../(text|file):...
+#         JSON:pet.dog.name/.../(text|file):...
+#
+#     The ellipses in /.../ indicate a regex.  The inline text for "text:" entries ends on
+#     the first blank line following.
+#
+#     If a match is made on a JSON value named pet.dog.name, the response can include {pet.dog.name}.
+#     If a match is made on a parameter named oo, the response can include {foo}.  In both cases, the
+#     parameters may also be used to select a file using "file:".
+#
+#     The rules are processed in order.  When the first match is made, processing stops and
+#     a response is generated.  A final rule with no selection criteria serves as a default
+#     or catch-all.
+#
+#     eg: http://127.0.0.1:5000/samples?_response=200 \
+#             PATH:/\b100\d{3}/file:samples/get/100xxx.json \
+#             PARAM:name/bob/file:samples/get/bob.json \
+#             PARAM:name/sue/file:samples/get/sue.json \
+#             JSON:pet.dog.name/Fido/file:samples/get/fido.json \
+#             file:samples/get/response.json
 #
 # TODO
 # - add error checking
-# - possibly add option to simulate errors, like HTTP status code 400, 500
 # - possibly allow variation in the response by defining a list of options to be selected in order by a stateful echo server.
 
 
