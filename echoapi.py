@@ -21,10 +21,10 @@
 #
 # TODO Other Parameters
 #     Capture parameters other than those in the request path that may be used to resolve and/or select
-#     (see Matching Rules) the response template.  This includes URL parameters supplied in addition to
+#     (see Selection Rules) the response template.  This includes URL parameters supplied in addition to
 #     _response and values inside json in the request body.
 #
-# TODO Matching Rules
+# TODO Selection Rules
 #     Allow response content to be selected based on regex matching of the path, parameters, or
 #     an value in the JSON body of a request.  This allows for more flexible response variability
 #     than simple mapping of response files based on the value of a parameter being in the path
