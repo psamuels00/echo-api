@@ -73,9 +73,6 @@ import re
 app = Flask(__name__)
 
 
-param_pat = re.compile('^(\w+):(.*)$')
-
-
 class Template:
 
     def __init__(self, text=None, file=None):
@@ -115,6 +112,8 @@ class Template:
 
 class EchoServer:
 
+    param_pat = re.compile('^(\w+):(.*)$')
+
     def __init__(self, path):
         self.parse_request_path(path)
         self.parse_response_parameter()
@@ -125,7 +124,7 @@ class EchoServer:
 
         parts = path.split('/')
         for part in parts:
-            m = param_pat.search(part)
+            m = self.param_pat.search(part)
             if m:
                 name, value = m.group(1), m.group(2)
                 self.params[name] = value
