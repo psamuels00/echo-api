@@ -8,11 +8,11 @@
 #
 # Named Path Parameters
 #     Recognize multiple, named parameters in the url path and render them in the response
-#     eg: http://127.0.0.1:5000/samples/id:{id}/other:{other}?_response=200 text:{ "id": {id}, "validation_date": null, "other": "{other}" }
+#     eg: http://127.0.0.1:5000/samples/id:{id}/other:{other}?_response=200 text:{ "id": {id}, "date": null, "other": "{other}" }
 #
 # Response Files
 #     Allow response to come from a file (or URL?) treated as a template wrt the named parameters.
-#     str.format(**data) may be sufficient as the templating system.
+#     str.format(**data) is used as the templating system.
 #     eg: http://127.0.0.1:5000/samples/id:{id}?_response=200 file:samples/get/response.json
 #
 # Map of Responses
@@ -21,13 +21,13 @@
 #
 # Other URL Parameters
 #     Capture parameters in the URL other than those in the request path that may be used to
-#     resolve and/or select (see Selection Rules) the response template.  This includes URL
-#     parameters supplied in addition to _response.
+#     resolve and/or select the response template.  This includes URL parameters supplied in
+#     addition to _response.
 #     eg: http://127.0.0.1:5000/samples/{id}?_response=200 file:samples/get/color/{color}.json
 #
 # TODO JSON in the Request Body
 #     Provide access to fields in a json object in the body of the request that may be used to
-#     resolve and/or select (see Selection Rules) the response template.
+#     resolve and/or select the response template.
 #     eg: http://127.0.0.1:5000/samples/{id}?_response=200 text:{ "group": { 'name': {json.group.name} } }
 #
 # TODO Selection Rules
@@ -41,16 +41,11 @@
 #         JSON:pet.dog.name /.../ (text|file):...
 #
 #     The ellipses in /.../ indicate a regex.  The inline text for "text:" entries ends on
-#     the first blank line following.
-#
-#     If a match is made on a json value named pet.dog.name, then {pet.dog.name} will be
-#     resolved in the response as expected.  If a match is made on a parameter named foo,
-#     then {foo} will be resolved as expected.  In both cases, the parameters may also be
-#     used to select a file using "file:".
-#
-#     The rules are processed in order.  When the first match is made, processing stops and
-#     a response is generated.  A final rule with no selection criteria serves as a default
-#     or catch-all.
+#     the first blank line following the start of the rule.  Any number of selection rules
+#     may be included for a response.  Each one must begin on a new line, being preceeded
+#     only by white space.  The rules are processed in order.  When the first match is made,
+#     processing stops and a response is generated.  A final rule with no selection criteria
+#     serves as a default or catch-all.
 #
 #     eg: http://127.0.0.1:5000/samples?_response=200 \
 #             PATH:       /\b100\d{3}/   file:samples/get/100xxx.json \
