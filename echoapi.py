@@ -19,40 +19,48 @@
 #     Allow response file to be selected by one or more named parameters.
 #     eg: http://127.0.0.1:5000/samples/id:{id}?_response=200 file:samples/get/{id}.json
 #
-# TODO Other Parameters
-#     Capture parameters other than those in the request path that may be used to resolve and/or select
-#     (see Selection Rules) the response template.  This includes URL parameters supplied in addition to
-#     _response and values inside json in the request body.
+# Other URL Parameters
+#     Capture parameters in the URL other than those in the request path that may be used to
+#     resolve and/or select (see Selection Rules) the response template.  This includes URL
+#     parameters supplied in addition to _response.
+#     eg: http://127.0.0.1:5000/samples/{id}?_response=200 file:samples/get/color/{color}.json
+#
+# TODO JSON in the Request Body
+#     Provide access to fields in a json object in the body of the request that may be used to
+#     resolve and/or select (see Selection Rules) the response template.
+#     eg: http://127.0.0.1:5000/samples/{id}?_response=200 text:{ "group": { 'name': {json.group.name} } }
 #
 # TODO Selection Rules
 #     Allow response content to be selected based on regex matching of the path, parameters, or
-#     an value in the JSON body of a request.  This allows for more flexible response variability
+#     a value in the json body of a request.  This allows for more flexible response variability
 #     than simple mapping of response files based on the value of a parameter being in the path
 #     to the file (see Map of Responses).  Rules have the following format:
 #
-#         PATH:/.../(text|file):...
-#         PARAM:foo/.../(text|file):...
-#         JSON:pet.dog.name/.../(text|file):...
+#         PATH: /.../ (text|file):...
+#         PARAM:foo /.../ (text|file):...
+#         JSON:pet.dog.name /.../ (text|file):...
 #
 #     The ellipses in /.../ indicate a regex.  The inline text for "text:" entries ends on
 #     the first blank line following.
 #
-#     If a match is made on a JSON value named pet.dog.name, the response can include {pet.dog.name}.
-#     If a match is made on a parameter named oo, the response can include {foo}.  In both cases, the
-#     parameters may also be used to select a file using "file:".
+#     If a match is made on a json value named pet.dog.name, then {pet.dog.name} will be
+#     resolved in the response as expected.  If a match is made on a parameter named foo,
+#     then {foo} will be resolved as expected.  In both cases, the parameters may also be
+#     used to select a file using "file:".
 #
 #     The rules are processed in order.  When the first match is made, processing stops and
 #     a response is generated.  A final rule with no selection criteria serves as a default
 #     or catch-all.
 #
 #     eg: http://127.0.0.1:5000/samples?_response=200 \
-#             PATH:/\b100\d{3}/file:samples/get/100xxx.json \
-#             PARAM:name/bob/file:samples/get/bob.json \
-#             PARAM:name/sue/file:samples/get/sue.json \
-#             JSON:pet.dog.name/Fido/file:samples/get/fido.json \
-#             file:samples/get/response.json
+#             PATH:       /\b100\d{3}/   file:samples/get/100xxx.json \
+#             PARAM:name         /bob/   file:samples/get/bob.json \
+#             PARAM:name         /sue/   file:samples/get/sue.json \
+#             JSON:pet.dog.name  /Fido/  file:samples/get/fido.json \
+#                                        file:samples/get/response.json
 #
 # TODO
+# - allow applcation of selection criteria to status code
 # - add error checking
 # - possibly allow variation in the response by defining a list of options to be selected in order by a stateful echo server.
 
@@ -139,7 +147,12 @@ class EchoServer:
     def response(self):
         args = { self.location: self.value }
         temp = Template(**args)
-        content = temp.resolve(self.params)
+
+        # resolve all parameters
+        params = { k: v for k, v in request.args.items() }
+        all_params = { **self.params, **params }
+        content = temp.resolve(all_params)
+
         return content, self.status_code
 
 
