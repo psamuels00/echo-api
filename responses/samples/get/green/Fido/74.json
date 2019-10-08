@@ -1,0 +1,5 @@
+{
+   "id": {id},
+   "pet": "{json.pet.dog.name}",
+   "color": "{color}"
+}

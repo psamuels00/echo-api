@@ -38,7 +38,7 @@
 #
 #     eg: http://127.0.0.1:5000/samples/{id}?_response=200 file:samples/get/color/{color}.json
 #
-# JSON in the Request Body (TODO)
+# JSON in the Request Body
 #
 #     Provide access to fields in a json object in the body of the request that may be used to
 #     resolve and/or select the response template.
@@ -68,10 +68,12 @@
 #         text: OK
 #
 #     The vertical bars may be included in environments where it is hard to insert newlines
-#     into the value, or to define multiple rules on a single line.  For example, the
-#     following line is equivalent to the rules specification above:
+#     into the value, or to define multiple rules on a single line.  The at symbol (@) and
+#     greater than symbol (>) can also be used like the vertical bar.  For example, the
+#     following lines are equivalent to the rules specification above:
 #
 #         200 | PATH: /delete/ text: error | PARAM:dog /fido|spot/ text: Hi {dog} | text: OK
+#         200 > PATH: /delete/ text: error > PARAM:dog /fido|spot/ text: Hi {dog} > text: OK
 #
 #     Blank lines are ignored and spaces may be added to the rules to make them more readable.
 #     For example:
@@ -81,7 +83,7 @@
 #
 #             PARAM:name         /bob/   file:samples/get/bob.json
 #             PARAM:name         /sue/   file:samples/get/sue.json
-#
+
 #             JSON:pet.dog.name  /Fido/  file:samples/get/fido.json
 #             JSON:pet.pig.name  /Sue/   file:samples/get/piggie.json
 #
@@ -89,19 +91,18 @@
 #
 # TODO
 # - finish testing selection rules, rule markers, and nested files
-# - finish adding support for JSON in the request body
 # - allow override of status code with each rule
 # - add error checking
-# - come up with a better name than "location" for "text" vs "file"
-# - ensure text is always lstrip()ped when parsed in and remove lstrip() from the code elsewhere
 #
 # TODO maybe
 # - add wildcard support for parameters and JSON fields ("PARAM:*" and "JSON:*")
 # - allow variation through list of responses to be selected in order, round-robin, by a stateful echo server
 
 
+from box import Box
 from collections import namedtuple
-from flask import Flask, request
+from flask import Flask, jsonify, request
+
 import os
 import re
 
@@ -144,23 +145,25 @@ class Rules:
             elif self.rules:
                 # add to the content of the most recent rule
                 rule = self.rules[-1]
+                # TODO this is silly to maintain 2 lists of lines
                 rule.lines.append(line)
                 rule.value.append(line)
             else:
                 self.add_rule(None, None, None, 'text', line, line)
 
-    def rule_selector_generator(self, params):
+    def rule_selector_generator(self, params, json):
         for rule in self.rules:
             if rule.selector_type is None:
                 yield rule
 
+            text = None
             if rule.selector_type == 'PARAM':
                 param_name = rule.selector_target
-                param = params.get(param_name, '')
-                text = param
+                text = params.get(param_name, '')
             elif rule.selector_type == 'JSON':
                 json_path = rule.selector_target
-                text = 'TODO'
+                fmt = '{' + json_path + '}'
+                text = fmt.format(json=json)
             elif rule.selector_type == 'BODY':
                 body = request.get_data()
                 text = body
@@ -235,10 +238,12 @@ class RulesTemplate:
             string = re.sub(r'([^\w])}', r'\1}}', string) # } not preceded by word char is converted to }}
         return string
 
-    def resolve_value(self, value, params):
-        if params:
+    def resolve_value(self, value, params, json):
+        if params or json:
+            p = params.copy()
+            p['json'] = json
             value = self.double_braces(value)
-            value = value.format(**params)
+            value = value.format(**p)
             value = self.double_braces(value, reverse=True)
         return value
 
@@ -248,17 +253,17 @@ class RulesTemplate:
             text = fh.read()
         return text
 
-    def get_text_to_resolve(self, file, params):
+    def get_text_to_resolve(self, file, params, json):
         text = None
 
         if file:
             # the text is loaded from a file in a recursive call to resolve()
-            file = self.resolve_value(file, params)
+            file = self.resolve_value(file, params, json)
             text = self.load_file(file)
         else:
             # the initial text is either supplied or loaded from a file
             if self.file:
-                file = self.resolve_value(self.file, params)
+                file = self.resolve_value(self.file, params, json)
                 text = self.load_file(file)
             else:
                 text = self.text
@@ -266,14 +271,14 @@ class RulesTemplate:
         return text
 
     # TODO rewrite this without file arg and using separate resolve_file() and a 3rd function w/ common code
-    def resolve(self, params, file=None):
-        text = self.get_text_to_resolve(file, params)
+    def resolve(self, params, json, file=None):
+        text = self.get_text_to_resolve(file, params, json)
 
         # first, resolve text or filename as a template
-        text = self.resolve_value(text, params)
+        text = self.resolve_value(text, params, json)
 
         rules = Rules(text)
-        rule_selector = rules.rule_selector_generator(params)
+        rule_selector = rules.rule_selector_generator(params, json)
 
         content = None
         while content is None:
@@ -285,7 +290,7 @@ class RulesTemplate:
                 if not rule:
                     pass
                 elif rule.location == 'file':
-                    content = self.resolve(params, file=rule.value[0])
+                    content = self.resolve(params, json, file=rule.value[0])
                 else:
                     content = '\n'.join(rule.value)
 
@@ -306,6 +311,7 @@ class EchoServer:
     def __init__(self, path):
         self.parse_request_path(path)
         self.parse_response_parameter()
+        self.parse_json_body()
 
     def parse_request_path(self, path):
         self.path = path         # the request path
@@ -328,15 +334,19 @@ class EchoServer:
         m = re.search('^\s*(\d{3})\s*(.*)$', self._response, re.DOTALL)
         if m:
             self.status_code = int(m.group(1))
-            response = m.group(2).lstrip()
+            self.value = m.group(2)
         else:
-            response = self._response.lstrip()
+            self.value = self._response.lstrip()
 
-        has_location = re.search('^(file|text):', response)
-        if has_location:
-            self.location, self.value = re.split(':', response, 1)
-        else:
-            self.value = response
+        m = re.search('^(file|text):\s*(.*)', self.value)
+        if m:
+            self.location = m.group(1)
+            self.value = m.group(2).lstrip()
+
+    def parse_json_body(self):
+        self.json = None  # Box of json object from the request body
+        json = request.get_json()
+        self.json = Box(json)
 
     def all_params(self):
         params = { k: v for k, v in request.args.items() }
@@ -346,8 +356,7 @@ class EchoServer:
         args = { self.location: self.value }
         template = RulesTemplate(**args)
         params = self.all_params()
-        content = template.resolve(params)
-
+        content = template.resolve(params, self.json)
         return content, self.status_code
 
 

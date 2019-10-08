@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from box import Box
 from echoapi import RulesTemplate
 
 import requests
@@ -93,21 +94,28 @@ class TestParameters(TestEchoServer):
             200, '{ "id": 75, "color": "green" }',
             'Other URL parameters in resolved content')
 
-    def test_json_parameters(self):
-        pass # TODO
-
-    def test_parameterized_file_name(self):
-        self.case('http://127.0.0.1:5000/samples/id:74/material:wood?_response=200 file:samples/get/{id}.json',
-            200, RulesTemplate(file='samples/get/74.json').resolve(dict(id=74, material='wood')),
-            'Content from resolved template file')
+    def test_json_value(self):
+        self.case('http://127.0.0.1:5000/samples/id:73?_response=200 text:{ "id": {id}, "dog": "{json.pet.dog.name}" }',
+            200, '{ "id": 73, "dog": "Fido" }',
+            'Json value in response template')
 
     def test_other_parameterized_file_name(self):
+        params = dict(id=76, color='green', age=7)
+        json = Box({})
         self.case('http://127.0.0.1:5000/samples/id:76?_response=200 file:samples/get/color/{color}.json',
-            200, RulesTemplate(file='samples/get/color/green.json').resolve(dict(id=76, color='green', age=7)),
+            200, RulesTemplate(file='samples/get/color/green.json').resolve(params, json),
             'Other URL parameters for selection of template file')
 
     def test_json_parameterized_file_name(self):
         pass # TODO
+
+    def test_path_other_and_json(self):
+        params = dict(id=74, color='green')
+        json = Box({ 'pet' : { 'dog': { 'name': 'Fido' }}})
+        self.case('http://127.0.0.1:5000/samples/id:74?_response=200 file:samples/get/{color}/{json.pet.dog.name}/{id}.json',
+            200, RulesTemplate(file='samples/get/green/Fido/74.json').resolve(params, json),
+            'Content from resolved template file')
+
 
 
 class TestSelectionRules(TestEchoServer):
