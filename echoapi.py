@@ -92,11 +92,13 @@
 # TODO
 # - finish testing selection rules, rule markers, and nested files
 # - allow override of status code with each rule
-# - add error checking
+# - add error checking everywhere
+# - optimization: precompile the static regular expressions
+# - optimization: cache file contents and maybe resolved instances
 #
 # TODO maybe
 # - add wildcard support for parameters and JSON fields ("PARAM:*" and "JSON:*")
-# - allow variation through list of responses to be selected in order, round-robin, by a stateful echo server
+# - allow variation through a list of responses to be selected in order, round-robin, by a stateful echo server
 
 
 from box import Box
@@ -120,7 +122,7 @@ class Rules:
         self.parse(text)
 
     def get_response_lines(self, text):
-        # replace | with newline if it precedes a selector type or location specifier
+        # replace one of [|@>] with newline if it precedes a selector type or location specifier
         multiline = re.sub(r'[|@>]\s*((PATH|PARAM|JSON|BODY|text|file):)', r'\n\1', text)
         lines = multiline.split('\n')
         return lines
