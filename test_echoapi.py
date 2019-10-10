@@ -74,7 +74,6 @@ class TestResponseFile(TestEchoServer):
             200, RulesTemplate().load_file('ok.txt'),
             'Simple static file response')
 
-    # TODO ensure trailing newline is not lost, then include this test
     def test_file_content_with_trailing_newlines(self):
         self.case('http://127.0.0.1:5000/samples?_response=200 file:trail_nl.txt',
             200, RulesTemplate().load_file('trail_nl.txt'),

@@ -94,8 +94,8 @@
 # - allow override of status code with each rule
 # - add error checking everywhere
 # - add support for comments following # at the beginning of a line
-# - allow blank lines after file: and one blank line after text:,
-#   other lines are included verbatim with the content
+# - allow blank lines after file: and one blank line after text:
+#   other lines are included verbatim with the text content
 #
 # TODO maybe
 # - add wildcard support for parameters and JSON fields ("PARAM:*" and "JSON:*")
