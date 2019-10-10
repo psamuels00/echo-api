@@ -115,7 +115,7 @@ import re
 app = Flask(__name__)
 
 
-Rule = namedtuple('Rule', ['selector_type', 'selector_target', 'pattern', 'location', 'value', 'lines'])
+Rule = namedtuple('Rule', ['selector_type', 'selector_target', 'pattern', 'location', 'value'])
 
 
 class Rules:
@@ -154,11 +154,9 @@ class Rules:
             elif self.rules:
                 # add to the content of the most recent rule
                 rule = self.rules[-1]
-                # TODO this is silly to maintain 2 lists of lines
-                rule.lines.append(line)
                 rule.value.append(line)
             else:
-                self.add_rule(None, None, None, 'text', line, line)
+                self.add_rule(None, None, None, 'text', line)
 
     def rule_selector_generator(self, params, json):
         for rule in self.rules:
@@ -180,14 +178,13 @@ class Rules:
             if re.search(rule.pattern, text):
                 yield rule
 
-    def add_rule(self, selector_type, selector_target, pattern, location, value, line):
+    def add_rule(self, selector_type, selector_target, pattern, location, value):
         rule = Rule(
             selector_type,    # one of { PATH, PARAM, JSON, BODY, None }
             selector_target,  # eg: id, or sample.location.name
             pattern,          # any regular expression
             location,         # one of { text, file }
-            [value],          # arbitrary text
-            [line])
+            [value])          # arbitrary text
         self.rules.append(rule)
 
     def is_blank(self, line):
@@ -199,35 +196,35 @@ class Rules:
     def is_matching_path_rule(self, line):
         m = re.match(r'\s*(PATH):\s*/(.*?)/\s*(text|file):\s*(.*)', line)
         if m:
-            self.add_rule(m.group(1), None, m.group(2), m.group(3), m.group(4), line)
+            self.add_rule(m.group(1), None, m.group(2), m.group(3), m.group(4))
             return True
         return False
 
     def is_matching_param_rule(self, line):
         m = re.match(r'\s*(PARAM):(.+?)\s*/(.*?)/\s*(text|file):\s*(.*)', line)
         if m:
-            self.add_rule(m.group(1), m.group(2), m.group(3), m.group(4), m.group(5), line)
+            self.add_rule(m.group(1), m.group(2), m.group(3), m.group(4), m.group(5))
             return True
         return False
 
     def is_matching_json_rule(self, line):
         m = re.match(r'\s*(JSON):(.+?)\s*/(.*?)/\s*(text|file):\s*(.*)', line)
         if m:
-            self.add_rule(m.group(1), m.group(2), m.group(3), m.group(4), m.group(5), line)
+            self.add_rule(m.group(1), m.group(2), m.group(3), m.group(4), m.group(5))
             return True
         return False
 
     def is_matching_body_rule(self, line):
         m = re.match(r'\s*(BODY):\s*/(.*?)/\s*(text|file):\s*(.*)', line)
         if m:
-            self.add_rule(m.group(1), None, m.group(2), m.group(3), m.group(4), line)
+            self.add_rule(m.group(1), None, m.group(2), m.group(3), m.group(4))
             return True
         return False
 
     def is_matching_rule(self, line):
         m = re.match(r'\s*(text|file):\s*(.*)', line, re.DOTALL)
         if m:
-            self.add_rule(None, None, None, m.group(1), m.group(2), line)
+            self.add_rule(None, None, None, m.group(1), m.group(2))
             return True
         return False
 
