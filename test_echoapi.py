@@ -71,15 +71,13 @@ class TestResponseText(TestEchoServer):
 class TestResponseFile(TestEchoServer):
     def test_file_content(self):
         self.case('http://127.0.0.1:5000/samples?_response=200 file:ok.txt',
-            200, 'okidoki',
-            #200, RulesTemplate().load_file('ok.txt'),
+            200, RulesTemplate().load_file('ok.txt'),
             'Simple static file response')
 
     # TODO ensure trailing newline is not lost, then include this test
-    def est_file_content_with_trailing_newlines(self):
+    def test_file_content_with_trailing_newlines(self):
         self.case('http://127.0.0.1:5000/samples?_response=200 file:trail_nl.txt',
-            200, 'trailing\nnewlines\n\n',
-            #200, RulesTemplate().load_file('trail_nl.txt'),
+            200, RulesTemplate().load_file('trail_nl.txt'),
             'Simple static file response with trailing newlines')
 
 
@@ -115,7 +113,6 @@ class TestParameters(TestEchoServer):
         self.case('http://127.0.0.1:5000/samples/id:74?_response=200 file:samples/get/{color}/{json.pet.dog.name}/{id}.json',
             200, RulesTemplate(file='samples/get/green/Fido/74.json').resolve(params, json),
             'Content from resolved template file')
-
 
 
 class TestSelectionRules(TestEchoServer):
@@ -172,5 +169,4 @@ class TestNestedFiles(TestEchoServer):
 
     def test_continue_after_no_match_on_nested_file(self):
         pass # TODO
-
 

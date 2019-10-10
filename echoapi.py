@@ -9,13 +9,13 @@
 #
 #     Return the same static response to all requests
 #
-#     eg: http://127.0.0.1:5000/samples?_response=200 text:{ "id": 45, "validation_date": null }
+#     eg: http://127.0.0.1:5000/samples?_response=200 { "id": 45, "validation_date": null }
 #
 # Named Path Parameters
 #
 #     Recognize multiple, named parameters in the url path and render them in the response
 #
-#     eg: http://127.0.0.1:5000/samples/id:{id}/other:{other}?_response=200 text:{ "id": {id}, "other": "{other}" }
+#     eg: http://127.0.0.1:5000/samples/id:{id}/lab:{lab}?_response=200 { "id": {id}, "lab": "{lab}" }
 #
 # Response Files
 #
@@ -93,12 +93,15 @@
 # - finish testing selection rules, rule markers, and nested files
 # - allow override of status code with each rule
 # - add error checking everywhere
-# - optimization: precompile the static regular expressions
-# - optimization: cache file contents and maybe resolved instances
+# - add support for comments following # at the beginning of a line
+# - allow blank lines after file: and one blank line after text:,
+#   other lines are included verbatim with the content
 #
 # TODO maybe
 # - add wildcard support for parameters and JSON fields ("PARAM:*" and "JSON:*")
 # - allow variation through a list of responses to be selected in order, round-robin, by a stateful echo server
+# - optimization: precompile the static regular expressions
+# - optimization: cache file contents and maybe resolved instances
 
 
 from box import Box
@@ -122,9 +125,15 @@ class Rules:
         self.parse(text)
 
     def get_response_lines(self, text):
+        # remove one of [|@>] from beginning of text to avoid creating an extra blank line
+        # by the sub() command below
+        m = re.match('[|@>]\s*(.*)', text, re.DOTALL)
+        if m: text = m.group(1)
+
         # replace one of [|@>] with newline if it precedes a selector type or location specifier
         multiline = re.sub(r'[|@>]\s*((PATH|PARAM|JSON|BODY|text|file):)', r'\n\1', text)
-        lines = multiline.split('\n')
+
+        lines = multiline.splitlines(keepends=True)
         return lines
 
     def parse(self, text):
@@ -132,8 +141,6 @@ class Rules:
         for line in lines:
             if self.is_status_code(line) and not self.rules:
                 self.status_code = int(line.strip())
-            elif self.is_blank(line):
-                pass
             elif self.is_matching_path_rule(line):
                 pass
             elif self.is_matching_param_rule(line):
@@ -218,7 +225,7 @@ class Rules:
         return False
 
     def is_matching_rule(self, line):
-        m = re.match(r'\s*(text|file):\s*(.*)', line)
+        m = re.match(r'\s*(text|file):\s*(.*)', line, re.DOTALL)
         if m:
             self.add_rule(None, None, None, m.group(1), m.group(2), line)
             return True
@@ -292,9 +299,9 @@ class RulesTemplate:
                 if not rule:
                     pass
                 elif rule.location == 'file':
-                    content = self.resolve(params, json, file=rule.value[0])
+                    content = self.resolve(params, json, file=rule.value[0].strip())
                 else:
-                    content = '\n'.join(rule.value)
+                    content = ''.join(rule.value)
 
             except StopIteration:
                 # there are no more matching rules
