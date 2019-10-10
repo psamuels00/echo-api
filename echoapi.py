@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 
-# Echo Server - receive a request and return a response defined by parameters of the request.
+# Echo Server - Receive a request and return a response defined by parameters of the request.
+#
+# The response status code and content can be included in the request.
+# TODO summarize features here.
 #
 # Here is a list of features and examples...
 #
@@ -94,14 +97,13 @@
 # - allow override of status code with each rule
 # - add error checking everywhere
 # - add support for comments following # at the beginning of a line
-# - allow blank lines after file: and one blank line after text:
-#   other lines are included verbatim with the text content
+# - ignore all blank lines after file: and the first blank line after text:
 #
 # TODO maybe
 # - add wildcard support for parameters and JSON fields ("PARAM:*" and "JSON:*")
 # - allow variation through a list of responses to be selected in order, round-robin, by a stateful echo server
-# - optimization: precompile the static regular expressions
 # - optimization: cache file contents and maybe resolved instances
+# - optimization: precompile the static regular expressions
 
 
 from box import Box

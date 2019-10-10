@@ -143,9 +143,16 @@ class TestRuleMarkers(TestEchoServer):
 
 
 class TestNestedFiles(TestEchoServer):
-    def test_nested_response_files(self):
+    def test_simple_nested_response_files(self):
+        self.case('http://127.0.0.1:5000/samples?_response=200 file:kingdom/animalia.echo',
+            200, "I'm a dog!\n")
+
+    def test_no_rule_selected(self):
         pass # TODO
 
     def test_continue_after_no_match_on_nested_file(self):
+        pass # TODO
+
+    def test_nested_response_files(self):
         pass # TODO
 
