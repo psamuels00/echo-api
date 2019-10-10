@@ -7,10 +7,6 @@ import requests
 import unittest
 
 
-#TODO make all request paths generic
-#TODO update all test labels
-
-
 class TestEchoServer(unittest.TestCase):
     def setUp(self):
         self.json = {
@@ -27,81 +23,69 @@ class TestEchoServer(unittest.TestCase):
             'age': 7,
         }
 
-    def case(self, url, expected_status_code, expected_content, label):
+    def case(self, url, expected_status_code, expected_content):
         r = requests.get(url, json=self.json, params=self.params)
         content = r.content.decode("utf-8")
-        self.assertEqual(r.status_code, expected_status_code, f'{label} (status code)')
-        self.assertEqual(content, expected_content, f'{label} (content)')
+        self.assertEqual(r.status_code, expected_status_code, '(status code)')
+        self.assertEqual(content, expected_content, '(content)')
 
 
 class TestSimpleResponse(TestEchoServer):
     def test_content_only(self):
         self.case('http://127.0.0.1:5000/labs/Illuminati?_response={ "id": 4 }',
-            200, '{ "id": 4 }',
-            'Simple static response, default status_code and location')
+            200, '{ "id": 4 }')
 
     def test_status_code_only(self):
-        self.case('http://127.0.0.1:5000/labs/Illuminati?_response=622', 622, '',
-            'Static response with status code only, no content')
+        self.case('http://127.0.0.1:5000/labs/Illuminati?_response=622', 622, '')
 
     def test_content_with_status_code(self):
         self.case('http://127.0.0.1:5000/labs/Illuminati?_response=201 { "id": 4 }',
-            201, '{ "id": 4 }',
-            'Simple static response, default location')
+            201, '{ "id": 4 }')
 
     def test_extra_fields(self):
         self.case('http://127.0.0.1:5000/samples/45?_response=200 { "id": 45, "date": null }&pet=dog',
-            200, '{ "id": 45, "date": null }',
-            'Static response with extra fields')
+            200, '{ "id": 45, "date": null }')
 
     def test_plain_text_response(self):
         text = "Doesn't need to be json.\nCould be multi-line."
         self.case(f"http://127.0.0.1:5000/labs/Illuminati?_response=200 {text}",
-            200, text,
-            'Static response with arbitrary text')
+            200, text)
 
 
 class TestResponseText(TestEchoServer):
     def test_text_content(self):
         self.case('http://127.0.0.1:5000/labs/Illuminati?_response=201 text:{ "id": 4 }',
-            201, '{ "id": 4 }',
-            'Simple static text response')
+            201, '{ "id": 4 }')
 
 
 class TestResponseFile(TestEchoServer):
     def test_file_content(self):
         self.case('http://127.0.0.1:5000/samples?_response=200 file:ok.txt',
-            200, RulesTemplate().load_file('ok.txt'),
-            'Simple static file response')
+            200, RulesTemplate().load_file('ok.txt'))
 
     def test_file_content_with_trailing_newlines(self):
         self.case('http://127.0.0.1:5000/samples?_response=200 file:trail_nl.txt',
-            200, RulesTemplate().load_file('trail_nl.txt'),
-            'Simple static file response with trailing newlines')
+            200, RulesTemplate().load_file('trail_nl.txt'))
 
 
 class TestParameters(TestEchoServer):
     def test_named_path_parameters(self):
         self.case('http://127.0.0.1:5000/samples/id:73/material:wood?_response=200 text:{ "id": {id}, "material": "{material}" }',
-            200, '{ "id": 73, "material": "wood" }',
-            'Named path parameters in response')
+            200, '{ "id": 73, "material": "wood" }')
 
     def test_other_url_parameters(self):
         self.case('http://127.0.0.1:5000/samples/id:75/material:wood?_response=200 text:{ "id": {id}, "color": "{color}" }',
-            200, '{ "id": 75, "color": "green" }',
-            'Other URL parameters in resolved content')
+            200, '{ "id": 75, "color": "green" }')
 
     def test_json_value(self):
         self.case('http://127.0.0.1:5000/samples/id:73?_response=200 text:{ "id": {id}, "dog": "{json.pet.dog.name}" }',
-            200, '{ "id": 73, "dog": "Fido" }',
-            'Json value in response template')
+            200, '{ "id": 73, "dog": "Fido" }')
 
     def test_other_parameterized_file_name(self):
         params = dict(id=76, color='green', age=7)
         json = Box({})
         self.case('http://127.0.0.1:5000/samples/id:76?_response=200 file:samples/get/color/{color}.json',
-            200, RulesTemplate(file='samples/get/color/green.json').resolve(params, json),
-            'Other URL parameters for selection of template file')
+            200, RulesTemplate(file='samples/get/color/green.json').resolve(params, json))
 
     def test_json_parameterized_file_name(self):
         pass # TODO
@@ -110,8 +94,7 @@ class TestParameters(TestEchoServer):
         params = dict(id=74, color='green')
         json = Box({ 'pet' : { 'dog': { 'name': 'Fido' }}})
         self.case('http://127.0.0.1:5000/samples/id:74?_response=200 file:samples/get/{color}/{json.pet.dog.name}/{id}.json',
-            200, RulesTemplate(file='samples/get/green/Fido/74.json').resolve(params, json),
-            'Content from resolved template file')
+            200, RulesTemplate(file='samples/get/green/Fido/74.json').resolve(params, json))
 
 
 class TestSelectionRules(TestEchoServer):
@@ -144,22 +127,19 @@ class TestRuleMarkers(TestEchoServer):
     def test_vertical_bar(self):
         text = "Doesn't need to be json.\nCould be multi-line."
         self.case(f"http://127.0.0.1:5000/labs/Illuminati?_response=200 |text:{text}",
-            200, text,
-            'Static response with arbitrary text and vertical bars')
+            200, text)
 
     def test_at(self):
         # TODO change this test to put @ before PARAM:
         text = "Doesn't need to be json.\nCould be multi-line."
         self.case(f"http://127.0.0.1:5000/labs/Illuminati?_response=200 @ text:{text}",
-            200, text,
-            'Static response with arbitrary text and vertical bars')
+            200, text)
 
     def test_gt(self):
         # TODO change this test to put @ before PATH:
         text = "Doesn't need to be json.\nCould be multi-line."
         self.case(f"http://127.0.0.1:5000/labs/Illuminati?_response=200 > text:{text}",
-            200, text,
-            'Static response with arbitrary text and vertical bars')
+            200, text)
 
 
 class TestNestedFiles(TestEchoServer):
