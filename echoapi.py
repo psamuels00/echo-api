@@ -262,30 +262,30 @@ class RulesTemplate:
             text = fh.read()
         return text
 
-    def get_text_to_resolve(self, file, params, json):
-        text = None
-
-        if file:
-            # the text is loaded from a file in a recursive call to resolve()
-            file = self.resolve_value(file, params, json)
+    def resolve(self, params, json):
+        if self.file:
+            # resolve file name and load file contents
+            file = self.resolve_value(self.file, params, json)
             text = self.load_file(file)
         else:
-            # the initial text is either supplied or loaded from a file
-            if self.file:
-                file = self.resolve_value(self.file, params, json)
-                text = self.load_file(file)
-            else:
-                text = self.text
+            text = self.text
 
-        return text
-
-    # TODO rewrite this without file arg and using separate resolve_file() and a 3rd function w/ common code
-    def resolve(self, params, json, file=None):
-        text = self.get_text_to_resolve(file, params, json)
-
-        # first, resolve text or filename as a template
+        # resolve contents
         text = self.resolve_value(text, params, json)
 
+        return self.select_content(params, json, text, level=0)
+
+    def resolve_file(self, params, json, file, level):
+        # resolve file name
+        file = self.resolve_value(file, params, json)
+
+        # load and resolve the file contents
+        text = self.load_file(file)
+        text = self.resolve_value(text, params, json)
+
+        return self.select_content(params, json, text, level)
+
+    def select_content(self, params, json, text, level):
         rules = Rules(text)
         rule_selector = rules.rule_selector_generator(params, json)
 
@@ -299,14 +299,15 @@ class RulesTemplate:
                 if not rule:
                     pass
                 elif rule.location == 'file':
-                    content = self.resolve(params, json, file=rule.value[0].strip())
+                    file = rule.value[0].strip()
+                    content = self.resolve_file(params, json, file, level + 1)
                 else:
                     content = ''.join(rule.value)
 
             except StopIteration:
                 # there are no more matching rules
                 # if this is the top-level call, return '' instead of None
-                if file is None:
+                if level == 0:
                     content = ''
                 break
 
