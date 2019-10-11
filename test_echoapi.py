@@ -52,7 +52,7 @@ class TestSimpleResponse(TestEchoServer):
             200, text)
 
 
-class TestResponseText(TestEchoServer):
+class TestResponseTextExplicit(TestEchoServer):
     def test_text_content(self):
         self.case('http://127.0.0.1:5000/labs/Illuminati?_response=201 text:{ "id": 4 }',
             201, '{ "id": 4 }')
