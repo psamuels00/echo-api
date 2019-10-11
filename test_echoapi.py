@@ -74,27 +74,37 @@ class TestParameters(TestEchoServer):
             200, '{ "id": 73, "material": "wood" }')
 
     def test_other_url_parameters(self):
-        self.case('http://127.0.0.1:5000/samples/id:75/material:wood?_response=200 text:{ "id": {id}, "color": "{color}" }',
+        self.case('http://127.0.0.1:5000/samples/id:75?_response=200 text:{ "id": {id}, "color": "{color}" }',
             200, '{ "id": 75, "color": "green" }')
 
     def test_json_value(self):
-        self.case('http://127.0.0.1:5000/samples/id:73?_response=200 text:{ "id": {id}, "dog": "{json.pet.dog.name}" }',
-            200, '{ "id": 73, "dog": "Fido" }')
+        self.case('http://127.0.0.1:5000/samples/id:77?_response=200 text:{ "id": {id}, "dog": "{json.pet.dog.name}" }',
+            200, '{ "id": 77, "dog": "Fido" }')
+
+
+class TestParametersInFileName(TestEchoServer):
+    def setUp(self):
+        super().setUp()
+        self.expected_content = RulesTemplate(file='samples/get/green/Fido/74.json').resolve(
+            params=dict(id=74, color='green', age=7),
+            json=Box({'pet': {'dog': {'name': 'Fido'}}})
+        )
+
+    def test_parameterized_file_name(self):
+        self.case('http://127.0.0.1:5000/samples/id:74?_response=200 file:samples/get/green/Fido/{id}.json',
+            200, self.expected_content)
 
     def test_other_parameterized_file_name(self):
-        params = dict(id=76, color='green', age=7)
-        json = Box({})
-        self.case('http://127.0.0.1:5000/samples/id:76?_response=200 file:samples/get/color/{color}.json',
-            200, RulesTemplate(file='samples/get/color/green.json').resolve(params, json))
+        self.case('http://127.0.0.1:5000/samples/id:74?_response=200 file:samples/get/{color}/Fido/74.json',
+            200, self.expected_content)
 
     def test_json_parameterized_file_name(self):
-        pass # TODO
+        self.case('http://127.0.0.1:5000/samples/id:74?_response=200 file:samples/get/green/{json.pet.dog.name}/74.json',
+            200, self.expected_content)
 
-    def test_path_other_and_json(self):
-        params = dict(id=74, color='green')
-        json = Box({ 'pet' : { 'dog': { 'name': 'Fido' }}})
+    def test_all_types_of_param(self):
         self.case('http://127.0.0.1:5000/samples/id:74?_response=200 file:samples/get/{color}/{json.pet.dog.name}/{id}.json',
-            200, RulesTemplate(file='samples/get/green/Fido/74.json').resolve(params, json))
+            200, self.expected_content)
 
 
 class TestSelectionRules(TestEchoServer):
