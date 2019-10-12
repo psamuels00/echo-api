@@ -233,6 +233,10 @@ class TestNestedFiles(TestEchoServer):
         self.case('http://127.0.0.1:5000/samples?_response=200 file:continue_after_no_match.echo',
             200, '{ "color": "green" }\n')
 
+    def test_continue_after_no_match_on_nested_file_no_selector(self):
+        self.case('http://127.0.0.1:5000/samples?_response=200 file:no_match_file_first.echo',
+            200, 'ok\n')
+
     def test_no_rule_selected(self):
         self.case('http://127.0.0.1:5000/samples?_response=200 file:no_match.echo', 200, '')
 
