@@ -152,8 +152,8 @@ class Rules:
                 pass
             elif self.is_matching_rule(line):
                 pass
-            elif self.rules:
-                # add to the content of the most recent rule
+            elif self.rules and self.rules[-1].location == 'text':
+                # add to the content of the most recent text rule
                 rule = self.rules[-1]
                 rule.value.append(line)
             else:
@@ -178,7 +178,7 @@ class Rules:
                 body = request.get_data().decode()
                 text = body
 
-            if re.search(rule.pattern, text):
+            if text and re.search(rule.pattern, text):
                 yield rule
 
     def add_rule(self, selector_type, selector_target, pattern, location, value):
@@ -234,9 +234,8 @@ class Rules:
 
 class RulesTemplate:
 
-    def __init__(self, text=None, file=None):
+    def __init__(self, text=''):
         self.text = text
-        self.file = file
 
     def double_braces(self, string, reverse=False):
         if reverse:
@@ -263,22 +262,10 @@ class RulesTemplate:
         return text
 
     def resolve(self, params, json):
-        if self.file:
-            # resolve file name and load file contents
-            file = self.resolve_value(self.file, params, json)
-            text = self.load_file(file)
-        else:
-            text = self.text
-
-        # resolve contents
-        text = self.resolve_value(text, params, json)
-
+        text = self.resolve_value(self.text, params, json)
         return self.select_content(params, json, text, level=0)
 
     def resolve_file(self, params, json, file, level):
-        # resolve file name
-        file = self.resolve_value(file, params, json)
-
         # load and resolve the file contents
         text = self.load_file(file)
         text = self.resolve_value(text, params, json)
@@ -331,27 +318,21 @@ class EchoServer:
         for part in parts:
             m = self.param_pat.search(part)
             if m:
-                name, value = m.group(1), m.group(2)
-                self.path_params[name] = value
+                name, content = m.group(1), m.group(2)
+                self.path_params[name] = content
 
     def parse_response_parameter(self):
         self._response = None    # input _response parameter
-        self.location = 'text'   # parsed from _response: 'text' or 'file'
-        self.value = ''          # parsed from _response: content or name of file with content
         self.status_code = 200   # parsed from _response: integer value
+        self.content = ''        # parsed from _response: content or name of file with content
 
         self._response = request.args.get('_response', '')
         m = re.search(r'^\s*(\d{3})\s*(.*)$', self._response, re.DOTALL)
         if m:
             self.status_code = int(m.group(1))
-            self.value = m.group(2)
+            self.content = m.group(2)
         else:
-            self.value = self._response.lstrip()
-
-        m = re.search(r'^(file|text):\s*(.*)', self.value)
-        if m:
-            self.location = m.group(1)
-            self.value = m.group(2).lstrip()
+            self.content = self._response.lstrip()
 
     def parse_json_body(self):
         self.json = None  # Box of json object from the request body
@@ -363,8 +344,7 @@ class EchoServer:
         return { **self.path_params, **params }
 
     def response(self):
-        args = { self.location: self.value }
-        template = RulesTemplate(**args)
+        template = RulesTemplate(self.content)
         params = self.all_params()
         content = template.resolve(params, self.json)
         return content, self.status_code

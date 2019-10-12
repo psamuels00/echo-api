@@ -85,7 +85,7 @@ class TestParameters(TestEchoServer):
 class TestParametersInFileName(TestEchoServer):
     def setUp(self):
         super().setUp()
-        self.expected_content = RulesTemplate(file='samples/get/green/Fido/74.json').resolve(
+        self.expected_content = RulesTemplate('file:samples/get/green/Fido/74.json').resolve(
             params=dict(id=74, color='green', age=7),
             json=Box({'pet': {'dog': {'name': 'Fido'}}})
         )
