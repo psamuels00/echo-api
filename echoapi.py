@@ -108,7 +108,7 @@
 
 from box import Box
 from collections import namedtuple
-from flask import Flask, jsonify, request
+from flask import Flask, request
 
 import os
 import re
@@ -129,7 +129,7 @@ class Rules:
     def get_response_lines(self, text):
         # remove one of [|@>] from beginning of text to avoid creating an extra blank line
         # by the sub() command below
-        m = re.match('[|@>]\s*(.*)', text, re.DOTALL)
+        m = re.match(r'[|@>]\s*(.*)', text, re.DOTALL)
         if m: text = m.group(1)
 
         # replace one of [|@>] with newline if it precedes a selector type or location specifier
@@ -193,10 +193,10 @@ class Rules:
         self.rules.append(rule)
 
     def is_blank(self, line):
-        return re.match('\s*$', line)
+        return re.match(r'\s*$', line)
 
     def is_status_code(self, line):
-        return re.match('\s*\d{3}\s*$', line)
+        return re.match(r'\s*\d{3}\s*$', line)
 
     def add_rule_if_match(self, line, pattern, groups):
         m = re.match(pattern, line, re.DOTALL)
@@ -342,14 +342,14 @@ class EchoServer:
         self.status_code = 200   # parsed from _response: integer value
 
         self._response = request.args.get('_response', '')
-        m = re.search('^\s*(\d{3})\s*(.*)$', self._response, re.DOTALL)
+        m = re.search(r'^\s*(\d{3})\s*(.*)$', self._response, re.DOTALL)
         if m:
             self.status_code = int(m.group(1))
             self.value = m.group(2)
         else:
             self.value = self._response.lstrip()
 
-        m = re.search('^(file|text):\s*(.*)', self.value)
+        m = re.search(r'^(file|text):\s*(.*)', self.value)
         if m:
             self.location = m.group(1)
             self.value = m.group(2).lstrip()
