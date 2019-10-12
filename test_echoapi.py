@@ -35,12 +35,28 @@ class TestSimpleResponse(TestEchoServer):
         self.case('http://127.0.0.1:5000/labs/Illuminati?_response={ "id": 4 }',
             200, '{ "id": 4 }')
 
+    def test_content_only_after_newline(self):
+        self.case('''http://127.0.0.1:5000/labs/Illuminati?_response=
+                     { "id": 4 }''',
+            200, '{ "id": 4 }')
+
     def test_status_code_only(self):
         self.case('http://127.0.0.1:5000/labs/Illuminati?_response=622', 622, '')
 
-    def test_content_with_status_code(self):
+    def test_status_code_only_after_newline(self):
+        self.case('''http://127.0.0.1:5000/labs/Illuminati?_response=
+                     622''',
+            622, '')
+
+    def test_status_code_and_content(self):
         self.case('http://127.0.0.1:5000/labs/Illuminati?_response=201 { "id": 4 }',
             201, '{ "id": 4 }')
+
+    def test_status_code_and_content_after_newline(self):
+        self.case('''http://127.0.0.1:5000/labs/Illuminati?_response=
+                     200
+                     { "id": 4 }''',
+            200, '{ "id": 4 }')
 
     def test_extra_fields(self):
         self.case('http://127.0.0.1:5000/samples/45?_response=200 { "id": 45, "date": null }&pet=dog',
@@ -56,6 +72,23 @@ class TestResponseTextExplicit(TestEchoServer):
     def test_text_content(self):
         self.case('http://127.0.0.1:5000/labs/Illuminati?_response=201 text:{ "id": 4 }',
             201, '{ "id": 4 }')
+
+    def test_text_content_after_newline(self):
+        self.case('''http://127.0.0.1:5000/labs/Illuminati?_response=201
+                     text:{ "id": 4 }''',
+            201, '{ "id": 4 }')
+
+    def test_text_content_multiline(self):
+        self.case('''http://127.0.0.1:5000/labs/Illuminati?_response=201
+                     text:{ "id": 4
+                     }''',
+            201, '{ "id": 4\n                     }')
+
+    def test_text_content_explicit_new_rule(self):
+        self.case('''http://127.0.0.1:5000/labs/Illuminati?_response=201
+                     { "id": 4 }
+                     text:Start new rule here''',
+            201, '{ "id": 4 }\n')
 
 
 class TestResponseFile(TestEchoServer):
@@ -156,7 +189,7 @@ class TestSelectionRules(TestEchoServer):
         self.case('''http://127.0.0.1:5000/it?_response=200
                      BODY: /Rocky/ { "pet": "moose" }
                      BODY: /Fido/  { "pet": "dog" }''',
-                  200, '{ "pet": "dog" }')
+            200, '{ "pet": "dog" }')
 
     def test_variety_of_rule_types(self):
         self.case('''http://127.0.0.1:5000/it?_response=200
@@ -165,7 +198,7 @@ class TestSelectionRules(TestEchoServer):
                      JSON:pet.dog.name  /Spot/       { "pet": "Spot" }
                      BODY:              /Rocky/      { "pet": "moose" }
                      PARAM:color        /green/      { "color": "green" }''',
-                  200, '{ "color": "green" }')
+            200, '{ "color": "green" }')
 
     def test_default_rule(self):
         self.case('''http://127.0.0.1:5000/it?_response=200
@@ -179,7 +212,7 @@ class TestSelectionRules(TestEchoServer):
                      PARAM:color /red/   { "color": "red" }
                      PARAM:color /green/ { "color": "green" }
                      { "color": "none" }''',
-                  200, '{ "color": "green" }\n                     { "color": "none" }')
+            200, '{ "color": "green" }\n                     { "color": "none" }')
 
     def test_no_matching_rule(self):
         self.case('''http://127.0.0.1:5000/it?_response=200
@@ -238,36 +271,55 @@ class TestNestedFiles(TestEchoServer):
             200, 'ok\n')
 
     def test_no_rule_selected(self):
-        self.case('http://127.0.0.1:5000/samples?_response=200 file:no_match.echo', 200, '')
+        self.case('http://127.0.0.1:5000/samples?_response=200 file:no_match.echo',
+            200, '')
 
 
 class TestBlankLines(TestEchoServer):
+
+    def test_blank_line_before_rules(self):
+        self.case('''http://127.0.0.1:5000/samples?_response=200
+
+                     file:no_match.echo
+                     text:ok''',
+            200, 'ok')
+
+    def test_blank_line_before_implied_text_rule(self):
+        self.case('''http://127.0.0.1:5000/samples?_response=200
+
+                     ok''',
+            200, 'ok')
 
     def test_one_blank_line_after_file(self):
         self.case('''http://127.0.0.1:5000/samples?_response=200
                      file:no_match.echo
 
-                     text:ok''', 200, 'ok')
+                     text:ok''',
+            200, 'ok')
 
     def test_two_blank_lines_after_file(self):
         self.case('''http://127.0.0.1:5000/samples?_response=200
                      file:no_match.echo
 
                      
-                     text:ok''', 200, 'ok')
+                     text:ok''',
+            200, 'ok')
 
     def test_one_blank_line_after_text(self):
         self.case('''http://127.0.0.1:5000/samples?_response=200
                      PARAM:color /green/ Apple
 
-                     text:default''', 200, 'Apple\n\n')
+                     text:default''',
+            200, 'Apple\n\n')
 
     def test_two_blank_lines_after_text(self):
         self.case('''http://127.0.0.1:5000/samples?_response=200
                      Apple
 
 
-                     text:default''', 200, 'Apple\n\n\n')
+                     text:default''',
+            200, 'Apple\n\n\n')
+
 
 
 class TestCommentLines(TestEchoServer):
