@@ -78,8 +78,9 @@
 #         200 | PATH: /delete/ text: error | PARAM:dog /fido|spot/ text: Hi {dog} | text: OK
 #         200 > PATH: /delete/ text: error > PARAM:dog /fido|spot/ text: Hi {dog} > text: OK
 #
-#     Blank lines are ignored and spaces may be added to the rules to make them more readable.
-#     For example:
+#     Blank lines following a text rule are considered part of the response content.  Blank
+#     lines following a file rule are ignored and spaces may be added to the rules to make
+#     them more readable. For example:
 #
 #         http://127.0.0.1:5000/samples?_response="200
 #             PATH:       /\b100\d{3}/   file:samples/get/100xxx.json
@@ -94,7 +95,6 @@
 #
 # TODO
 # - add support for comments following # at the beginning of a line, and complete tests
-# - add support for blank lines: all following a file rule and first line following text rule, and complete tests
 # - add error checking everywhere, and add tests
 #
 # TODO maybe
@@ -150,12 +150,15 @@ class Rules:
                 pass
             elif self.is_matching_body_rule(line):
                 pass
-            elif self.is_matching_rule(line):
+            elif self.is_matching_rule_with_explicit_location(line):
                 pass
             elif self.rules and self.rules[-1].location == 'text':
-                # add to the content of the most recent text rule
+                # add to the content of the most recent rule, which is a text rule
                 rule = self.rules[-1]
                 rule.value.append(line)
+            elif self.is_blank(line):
+                # ignore blank lines before any rules or after a file rule
+                pass
             else:
                 self.add_rule(None, None, None, 'text', line)
 
@@ -226,7 +229,7 @@ class Rules:
             '\s*(BODY):\s*/(.*?)/\s*((text|file):)?\s*(.*)',
             (   1,     0,  2,        4,               5   ))
 
-    def is_matching_rule(self, line):
+    def is_matching_rule_with_explicit_location(self, line):
         return self.add_rule_if_match(line,
             '\s*(text|file):\s*(.*)',
             (0,0,0,1,          2  ))

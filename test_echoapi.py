@@ -244,16 +244,30 @@ class TestNestedFiles(TestEchoServer):
 class TestBlankLines(TestEchoServer):
 
     def test_one_blank_line_after_file(self):
-        pass # TODO
+        self.case('''http://127.0.0.1:5000/samples?_response=200
+                     file:no_match.echo
 
-    def test_three_blank_lines_after_file(self):
-        pass # TODO
+                     text:ok''', 200, 'ok')
+
+    def test_two_blank_lines_after_file(self):
+        self.case('''http://127.0.0.1:5000/samples?_response=200
+                     file:no_match.echo
+
+                     
+                     text:ok''', 200, 'ok')
 
     def test_one_blank_line_after_text(self):
-        pass # TODO
+        self.case('''http://127.0.0.1:5000/samples?_response=200
+                     PARAM:color /green/ Apple
 
-    def test_three_blank_lines_after_text(self):
-        pass # TODO
+                     text:default''', 200, 'Apple\n\n')
+
+    def test_two_blank_lines_after_text(self):
+        self.case('''http://127.0.0.1:5000/samples?_response=200
+                     Apple
+
+
+                     text:default''', 200, 'Apple\n\n\n')
 
 
 class TestCommentLines(TestEchoServer):
