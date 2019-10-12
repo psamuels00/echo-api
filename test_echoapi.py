@@ -276,7 +276,6 @@ class TestNestedFiles(TestEchoServer):
 
 
 class TestBlankLines(TestEchoServer):
-
     def test_blank_line_before_rules(self):
         self.case('''http://127.0.0.1:5000/samples?_response=200
 
@@ -301,7 +300,7 @@ class TestBlankLines(TestEchoServer):
         self.case('''http://127.0.0.1:5000/samples?_response=200
                      file:no_match.echo
 
-                     
+
                      text:ok''',
             200, 'ok')
 
@@ -321,14 +320,52 @@ class TestBlankLines(TestEchoServer):
             200, 'Apple\n\n\n')
 
 
+class TestComments(TestEchoServer):
+    def test_comment_before_rules(self):
+        self.case('''http://127.0.0.1:5000/samples?_response=200
+                     %23 the sky is pretty
+                     the sky is blue''',
+            200, '                     the sky is blue')
 
-class TestCommentLines(TestEchoServer):
+    def test_comment_after_file_rule(self):
+        self.case('''http://127.0.0.1:5000/samples?_response=200
+                     file:no_match.echo
+                     %23 no match so far
+                     text: got match?''',
+            200, 'got match?')
 
-    def test_comment(self):
-        pass # TODO
+    def test_comment_after_text_rule(self):
+        self.case('''http://127.0.0.1:5000/samples?_response=200
+                     Bananas are fun.
+                     %23 go bananas!
+                     text: unreachable rule''',
+            200, 'Bananas are fun.\n')
 
-    def test_comment_after_file(self):
-        pass # TODO
+    def test_comment_in_middle_of_text_rule(self):
+        self.case('''http://127.0.0.1:5000/samples?_response=200
+                     Bananas are fun.
+                     %23 go bananas!
+                     Peaches are fun too!''',
+            200, 'Bananas are fun.\n                     Peaches are fun too!')
 
-    def test_comment_after_text(self):
-        pass # TODO
+
+class TestCommentsInFiles(TestEchoServer):
+    def test_comments_in_file(self):
+        self.case('http://127.0.0.1:5000/samples?_response=200 file:comments.echo',
+                  200, 'porcupine\n')
+
+    def test_comment_before_rules_in_file(self):
+        self.case('http://127.0.0.1:5000/samples?_response=200 file:comment_before_rules.echo',
+                  200, 'the sky is blue\n')
+
+    def test_comment_after_file_rule_in_file(self):
+        self.case('http://127.0.0.1:5000/samples?_response=200 file:comment_after_file.echo',
+                  200, 'got match?\n')
+
+    def test_comment_after_text_rule_in_file(self):
+        self.case('http://127.0.0.1:5000/samples?_response=200 file:comment_after_text.echo',
+                  200, 'Bananas are fun.\n')
+
+    def test_comment_in_middle_of_text_rule_in_file(self):
+        self.case('http://127.0.0.1:5000/samples?_response=200 file:comment_in_middle_of_text.echo',
+                  200, 'Bananas are fun.\nPeaches are fun too!\n')

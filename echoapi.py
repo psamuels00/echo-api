@@ -70,6 +70,8 @@
 #         PARAM:dog /fido|spot/ text: Hi {dog}
 #         text: OK
 #
+# Formatting and Whitespace
+#
 #     The vertical bars may be included in environments where it is hard to insert newlines
 #     into the value, or to define multiple rules on a single line.  The at symbol (@) and
 #     greater than symbol (>) can also be used like the vertical bar.  For example, the
@@ -82,7 +84,7 @@
 #     lines following a file rule are ignored and spaces may be added to the rules to make
 #     them more readable. For example:
 #
-#         http://127.0.0.1:5000/samples?_response="200
+#         http://127.0.0.1:5000/samples?_response=200
 #             PATH:       /\b100\d{3}/   file:samples/get/100xxx.json
 #
 #             PARAM:name         /bob/   file:samples/get/bob.json
@@ -91,18 +93,60 @@
 #             JSON:pet.dog.name  /Fido/  file:samples/get/fido.json
 #             JSON:pet.pig.name  /Sue/   file:samples/get/piggie.json
 #
-#                                        file:samples/get/response.json"
+#                                        file:samples/get/response.json
+#
+# Comments
+#
+#     Any line beginning with #, or whitespace followed by # is ignored, even if it is
+#     included in the content of a text rule.  Consequently, there is no way to include
+#     a comment line in the response content.  A file may look like this, for example:
+#
+#         # exceptional people
+#         # ------------------
+#         PARAM:name  /bob/  file:samples/get/bob.json
+#         PARAM:name  /sue/  file:samples/get/sue.json
+#
+#         # house plants
+#         # ------------
+#         PARAM:plant  /fern/  file:plants/get/fern.json
+#         PARAM:plant  /ficus/ file:plants/get/ficus.json
+#
+#         # anything else
+#         # -------------
+#         PATH: /sample/ { "type": "sample" }
+#         PATH: /lab/    { "type": "lab" }
+#         #
+#         PARAM:id /70/  { "group": "fruit" }
+#         PARAM:id /71/  { "group": "vegetable" }
+#
+#     When included directly in the _response parameter, '#' must be encoded as %23.
+#     For example:
+#
+#         http://127.0.0.1:5000/samples?_response=200
+#             %23 comment before rules
+#             PARAM:name  /bob/  file:samples/get/bob.json
+#             %23 another comment
+#             PARAM:name  /sue/  file:samples/get/sue.json"
+#
+# Limitations
+#
+#     o  Inline _response content cannot contain '#' or '&'.  These characters must be encoded
+#        as %23 and %26 respectively.  (These characters are allowed in file content.)
+#     o  Response content cannot contain lines beginning with '#' or whitespace followed by '#'.
+#        This is true of inline _response content as well as content stored in a file.
 #
 # TODO
-# - add support for comments following # at the beginning of a line, and complete tests
-# - add error checking everywhere, and add tests
+# - add error checking everywhere, and add unit tests for each condition
+# - add support for selection based on header values
+# - add support for use as a library in addition to use as a service
+# - add support for delay in response
+# - allow override of status code with each rule (eg: PARAM: name /bob/ 404 file:samples/not_found)
 #
 # TODO maybe
-# - allow override of status code with each rule (eg: PARAM: name /bob/ 404 file:samples/not_found)
 # - add wildcard support for parameters and JSON fields ("PARAM:*" and "JSON:*")
 # - allow variation through a list of responses to be selected in order, round-robin, by a stateful echo server
 # - optimization: cache file contents and maybe resolved instances
-# - optimization: precompile the static regular expressions
+# - optimization: precompile all the static regular expressions
 
 
 from box import Box
@@ -140,7 +184,9 @@ class Rules:
     def parse(self, text):
         lines = self.get_response_lines(text)
         for line in lines:
-            if self.is_status_code(line) and not self.rules:
+            if self.is_comment(line):
+                pass
+            elif self.is_status_code(line) and not self.rules:
                 self.status_code = int(line.strip())
             elif self.is_matching_path_rule(line):
                 pass
@@ -193,6 +239,9 @@ class Rules:
             location,         # one of { text, file }
             [value])          # arbitrary text
         self.rules.append(rule)
+
+    def is_comment(self, line):
+        return re.match(r'\s*#', line)
 
     def is_blank(self, line):
         return re.match(r'\s*$', line)

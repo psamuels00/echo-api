@@ -1,0 +1,20 @@
+# exceptional people
+# ------------------
+PARAM:name  /bob/  file:samples/get/bob.json
+PARAM:name  /sue/  file:samples/get/sue.json
+
+# house plants
+# ------------
+PARAM:plant  /fern/  file:plants/get/fern.json
+PARAM:plant  /ficus/ file:plants/get/ficus.json
+
+# anything else
+# -------------
+PATH: /size/   { "type": "size" }
+PATH: /sound/  { "type": "sound" }
+#
+PARAM:id /70/  { "group": "fruit" }
+PARAM:id /71/  { "group": "vegetable" }
+# default
+# -------
+text:porcupine
