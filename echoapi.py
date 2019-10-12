@@ -86,20 +86,19 @@
 #
 #             PARAM:name         /bob/   file:samples/get/bob.json
 #             PARAM:name         /sue/   file:samples/get/sue.json
-
+#
 #             JSON:pet.dog.name  /Fido/  file:samples/get/fido.json
 #             JSON:pet.pig.name  /Sue/   file:samples/get/piggie.json
 #
 #                                        file:samples/get/response.json"
 #
 # TODO
-# - finish testing selection rules, rule markers, and nested files
-# - allow override of status code with each rule (eg: PARAM: name /bob/ 404 file:samples/not_found)
-# - add error checking everywhere
-# - add support for comments following # at the beginning of a line
-# - add support for blank lines: all following a file rule and first line following text rule
+# - add support for comments following # at the beginning of a line, and complete tests
+# - add support for blank lines: all following a file rule and first line following text rule, and complete tests
+# - add error checking everywhere, and add tests
 #
 # TODO maybe
+# - allow override of status code with each rule (eg: PARAM: name /bob/ 404 file:samples/not_found)
 # - add wildcard support for parameters and JSON fields ("PARAM:*" and "JSON:*")
 # - allow variation through a list of responses to be selected in order, round-robin, by a stateful echo server
 # - optimization: cache file contents and maybe resolved instances

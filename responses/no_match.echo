@@ -1,0 +1,4 @@
+PARAM:shape        /circle/     { "shape": "circle" }
+PATH:              /insect.fly/ { "type": "fly" }
+JSON:pet.dog.name  /Spot/       { "pet": "Spot" }
+BODY:              /Rocky/      { "pet": "moose" }

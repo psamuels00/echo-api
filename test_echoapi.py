@@ -221,17 +221,20 @@ class TestNestedFiles(TestEchoServer):
         self.case('http://127.0.0.1:5000/samples?_response=200 file:kingdom/animalia.echo',
             200, "I'm a dog!\n")
 
-    def test_no_rule_selected(self):
-        pass # TODO
+    def test_match_param_on_nested_file(self):
+        self.case('http://127.0.0.1:5000/samples/id:72?_response=200 file:match_param.echo',
+            200, '{ "color": "green" }\n')
+
+    def test_double_hop_matching(self):
+        self.case('http://127.0.0.1:5000/samples/id:72?_response=200 file:match_json.echo',
+            200, '{ "color": "green" }\n')
 
     def test_continue_after_no_match_on_nested_file(self):
-        pass # TODO
+        self.case('http://127.0.0.1:5000/samples?_response=200 file:continue_after_no_match.echo',
+            200, '{ "color": "green" }\n')
 
-    def test_match_param_on_nested_file(self):
-        pass # TODO
-
-    def test_match_param_on_nested_file_then_match_json(self):
-        pass # TODO
+    def test_no_rule_selected(self):
+        self.case('http://127.0.0.1:5000/samples?_response=200 file:no_match.echo', 200, '')
 
 
 class TestBlankLines(TestEchoServer):
@@ -248,3 +251,14 @@ class TestBlankLines(TestEchoServer):
     def test_three_blank_lines_after_text(self):
         pass # TODO
 
+
+class TestCommentLines(TestEchoServer):
+
+    def test_comment(self):
+        pass # TODO
+
+    def test_comment_after_file(self):
+        pass # TODO
+
+    def test_comment_after_text(self):
+        pass # TODO

@@ -1,0 +1,2 @@
+PATH:        /insect.fly/ { "type": "fly" }
+PARAM:id     /72/         { "color": "green" }
