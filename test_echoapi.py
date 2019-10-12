@@ -109,47 +109,111 @@ class TestParametersInFileName(TestEchoServer):
 
 class TestSelectionRules(TestEchoServer):
     def test_no_criteria(self):
-        pass # TODO
+        self.case('http://127.0.0.1:5000/it?_response=200 { "name": "foo" }',
+            200, '{ "name": "foo" }')
+
+    def test_whitespace_in_rules(self):
+        self.case('http://127.0.0.1:5000/it?_response=200 PARAM:color/green/Good', 200, 'Good')
+        self.case('http://127.0.0.1:5000/it?_response=200 PARAM:color/green/text:Good', 200, 'Good')
+        self.case('http://127.0.0.1:5000/it?_response=200  PARAM: color /green/ Good', 200, 'Good')
+        self.case('http://127.0.0.1:5000/it?_response=200  PARAM: color /green/ text: Good', 200, 'Good')
+
+    def test_whitespace_not_allowed_in_selector(self):
+        self.case('http://127.0.0.1:5000/it?_response=200 PARAM :color /green/ text:Good',
+            200, 'PARAM :color /green/ text:Good')
 
     def test_match_first_param(self):
-        pass # TODO
+        self.case('''http://127.0.0.1:5000/it?_response=200
+                     PARAM:color /green/ { "color": "green" }
+                     PARAM:color /blue/  { "color": "blue" }''',
+            200, '{ "color": "green" }\n')
 
     def test_match_second_param(self):
-        pass # TODO
+        self.case('''http://127.0.0.1:5000/it?_response=200
+                     PARAM:color /blue/  { "color": "blue" }
+                     PARAM:color /green/ { "color": "green" }''',
+            200, '{ "color": "green" }')
+
+    def test_match_path_param(self):
+        self.case('''http://127.0.0.1:5000/shape:square?_response=200
+                     PARAM:shape /circle/  { "shape": "circle" }
+                     PARAM:shape /square/  { "shape": "square" }''',
+            200, '{ "shape": "square" }')
 
     def test_match_path(self):
-        pass # TODO
+        self.case('''http://127.0.0.1:5000/insect/ant?_response=200
+                     PATH: /insect.fly/  { "type": "fly" }
+                     PATH: /insect.ant/  { "type": "ant" }''',
+            200, '{ "type": "ant" }')
 
     def test_match_json(self):
-        pass # TODO
+        self.case('''http://127.0.0.1:5000/it?_response=200
+                     JSON:pet.dog.name /Spot/  { "pet": "Spot" }
+                     JSON:pet.dog.name /^Fi/  { "pet": "{json.pet.dog.name}" }''',
+            200, '{ "pet": "Fido" }')
+
+    def test_match_body(self):
+        self.case('''http://127.0.0.1:5000/it?_response=200
+                     BODY: /Rocky/ { "pet": "moose" }
+                     BODY: /Fido/  { "pet": "dog" }''',
+                  200, '{ "pet": "dog" }')
+
+    def test_variety_of_rule_types(self):
+        self.case('''http://127.0.0.1:5000/it?_response=200
+                     PARAM:shape        /circle/     { "shape": "circle" }
+                     PATH:              /insect.fly/ { "type": "fly" }
+                     JSON:pet.dog.name  /Spot/       { "pet": "Spot" }
+                     BODY:              /Rocky/      { "pet": "moose" }
+                     PARAM:color        /green/      { "color": "green" }''',
+                  200, '{ "color": "green" }')
 
     def test_default_rule(self):
-        pass # TODO
+        self.case('''http://127.0.0.1:5000/it?_response=200
+                     PARAM:color /red/  { "color": "red" }
+                     PARAM:color /blue/ { "color": "blue" }
+                     text: { "color": "none" }''',
+            200, '{ "color": "none" }')
+
+    def test_implied_text_on_default_rule_not_allowed(self):
+        self.case('''http://127.0.0.1:5000/it?_response=200
+                     PARAM:color /red/   { "color": "red" }
+                     PARAM:color /green/ { "color": "green" }
+                     { "color": "none" }''',
+                  200, '{ "color": "green" }\n                     { "color": "none" }')
 
     def test_no_matching_rule(self):
-        pass # TODO
-
-    def test_blank_lines(self):
-        pass # TODO
+        self.case('''http://127.0.0.1:5000/it?_response=200
+                     PARAM:color /red/  { "color": "red" }
+                     PARAM:color /blue/ { "color": "blue" }''',
+            200, '')
 
 
 class TestRuleMarkers(TestEchoServer):
     def test_vertical_bar(self):
-        text = "Doesn't need to be json.\nCould be multi-line."
-        self.case(f"http://127.0.0.1:5000/labs/Illuminati?_response=200 |text:{text}",
-            200, text)
+        self.case('''http://127.0.0.1:5000/it?_response=200
+                  |  PATH:              /insect.fly/ { "type": "fly" }
+                  |  PARAM:shape        /circle/     { "shape": "circle" }
+                  |  PARAM:color        /green/      { "color": "green" }''',
+            200, '{ "color": "green" }')
 
-    def test_at(self):
-        # TODO change this test to put @ before PARAM:
+    def test_vertical_bar2(self):
         text = "Doesn't need to be json.\nCould be multi-line."
         self.case(f"http://127.0.0.1:5000/labs/Illuminati?_response=200 @ text:{text}",
             200, text)
 
+    def test_at(self):
+        self.case('''http://127.0.0.1:5000/it?_response=200
+                  @  PATH:              /insect.fly/ { "type": "fly" }
+                  @  PARAM:shape        /circle/     { "shape": "circle" }
+                  @  PARAM:color        /green/      { "color": "green" }''',
+            200, '{ "color": "green" }')
+
     def test_gt(self):
-        # TODO change this test to put @ before PATH:
-        text = "Doesn't need to be json.\nCould be multi-line."
-        self.case(f"http://127.0.0.1:5000/labs/Illuminati?_response=200 > text:{text}",
-            200, text)
+        self.case('''http://127.0.0.1:5000/it?_response=200
+                  >  PATH:              /insect.fly/ { "type": "fly" }
+                  >  PARAM:shape        /circle/     { "shape": "circle" }
+                  >  PARAM:color        /green/      { "color": "green" }''',
+            200, '{ "color": "green" }')
 
 
 class TestNestedFiles(TestEchoServer):
@@ -163,6 +227,24 @@ class TestNestedFiles(TestEchoServer):
     def test_continue_after_no_match_on_nested_file(self):
         pass # TODO
 
-    def test_nested_response_files(self):
+    def test_match_param_on_nested_file(self):
+        pass # TODO
+
+    def test_match_param_on_nested_file_then_match_json(self):
+        pass # TODO
+
+
+class TestBlankLines(TestEchoServer):
+
+    def test_one_blank_line_after_file(self):
+        pass # TODO
+
+    def test_three_blank_lines_after_file(self):
+        pass # TODO
+
+    def test_one_blank_line_after_text(self):
+        pass # TODO
+
+    def test_three_blank_lines_after_text(self):
         pass # TODO
 

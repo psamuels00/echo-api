@@ -94,10 +94,10 @@
 #
 # TODO
 # - finish testing selection rules, rule markers, and nested files
-# - allow override of status code with each rule
+# - allow override of status code with each rule (eg: PARAM: name /bob/ 404 file:samples/not_found)
 # - add error checking everywhere
 # - add support for comments following # at the beginning of a line
-# - ignore all blank lines after file: and the first blank line after text:
+# - add support for blank lines: all following a file rule and first line following text rule
 #
 # TODO maybe
 # - add wildcard support for parameters and JSON fields ("PARAM:*" and "JSON:*")
@@ -166,21 +166,24 @@ class Rules:
                 yield rule
 
             text = None
-            if rule.selector_type == 'PARAM':
+            if rule.selector_type == 'PATH':
+                text = request.path
+            elif rule.selector_type == 'PARAM':
                 param_name = rule.selector_target
                 text = params.get(param_name, '')
             elif rule.selector_type == 'JSON':
                 json_path = rule.selector_target
-                fmt = '{' + json_path + '}'
+                fmt = '{json.' + json_path + '}'
                 text = fmt.format(json=json)
             elif rule.selector_type == 'BODY':
-                body = request.get_data()
+                body = request.get_data().decode()
                 text = body
 
             if re.search(rule.pattern, text):
                 yield rule
 
     def add_rule(self, selector_type, selector_target, pattern, location, value):
+        location = location or 'text'
         rule = Rule(
             selector_type,    # one of { PATH, PARAM, JSON, BODY, None }
             selector_target,  # eg: id, or sample.location.name
@@ -195,40 +198,39 @@ class Rules:
     def is_status_code(self, line):
         return re.match('\s*\d{3}\s*$', line)
 
-    def is_matching_path_rule(self, line):
-        m = re.match(r'\s*(PATH):\s*/(.*?)/\s*(text|file):\s*(.*)', line)
+    def add_rule_if_match(self, line, pattern, groups):
+        m = re.match(pattern, line, re.DOTALL)
         if m:
-            self.add_rule(m.group(1), None, m.group(2), m.group(3), m.group(4))
+            args = [ m.group(n) if n else None
+                     for n in groups ]
+            self.add_rule(*args)
             return True
         return False
+
+    def is_matching_path_rule(self, line):
+        return self.add_rule_if_match(line,
+            '\s*(PATH):\s*/(.*?)/\s*((text|file):)?\s*(.*)',
+            (   1,     0,  2,        4,               5   ))
 
     def is_matching_param_rule(self, line):
-        m = re.match(r'\s*(PARAM):(.+?)\s*/(.*?)/\s*(text|file):\s*(.*)', line)
-        if m:
-            self.add_rule(m.group(1), m.group(2), m.group(3), m.group(4), m.group(5))
-            return True
-        return False
+        return self.add_rule_if_match(line,
+            '\s*(PARAM):\s*(.+?)\s*/(.*?)/\s*((text|file):)?\s*(.*)',
+            (   1,      2,       3,        5,               6   ))
 
     def is_matching_json_rule(self, line):
-        m = re.match(r'\s*(JSON):(.+?)\s*/(.*?)/\s*(text|file):\s*(.*)', line)
-        if m:
-            self.add_rule(m.group(1), m.group(2), m.group(3), m.group(4), m.group(5))
-            return True
-        return False
+        return self.add_rule_if_match(line,
+            '\s*(JSON):\s*(.+?)\s*/(.*?)/\s*((text|file):)?\s*(.*)',
+            (   1,      2,       3,        5,               6   ))
 
     def is_matching_body_rule(self, line):
-        m = re.match(r'\s*(BODY):\s*/(.*?)/\s*(text|file):\s*(.*)', line)
-        if m:
-            self.add_rule(m.group(1), None, m.group(2), m.group(3), m.group(4))
-            return True
-        return False
+        return self.add_rule_if_match(line,
+            '\s*(BODY):\s*/(.*?)/\s*((text|file):)?\s*(.*)',
+            (   1,     0,  2,        4,               5   ))
 
     def is_matching_rule(self, line):
-        m = re.match(r'\s*(text|file):\s*(.*)', line, re.DOTALL)
-        if m:
-            self.add_rule(None, None, None, m.group(1), m.group(2))
-            return True
-        return False
+        return self.add_rule_if_match(line,
+            '\s*(text|file):\s*(.*)',
+            (0,0,0,1,          2  ))
 
 
 class RulesTemplate:
