@@ -1,2 +1,0 @@
-PARAM:color /green/ file:no_match.echo
-PARAM:color /green/ { "color": "green" }

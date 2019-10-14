@@ -51,7 +51,7 @@ addition to \_response.  For example:
 ## JSON in the Request Body
 
 Provide access to fields in a json object in the body of the request that may be used to
-resolve and/or select the response template.  For example
+resolve and/or select the response template.  For example:
 
     http://127.0.0.1:5000/samples/{id}?_response=200 text:{ "group": { "name": "{json.group.name}" } }
 

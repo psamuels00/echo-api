@@ -1,12 +1,12 @@
 # exceptional people
 # ------------------
-PARAM:name  /bob/  file:samples/get/bob.json
-PARAM:name  /sue/  file:samples/get/sue.json
+PARAM:name  /bob/  file:test/samples/get/bob.json
+PARAM:name  /sue/  file:test/samples/get/sue.json
 
 # house plants
 # ------------
-PARAM:plant  /fern/  file:plants/get/fern.json
-PARAM:plant  /ficus/ file:plants/get/ficus.json
+PARAM:plant  /fern/  file:test/plants/get/fern.json
+PARAM:plant  /ficus/ file:test/plants/get/ficus.json
 
 # anything else
 # -------------

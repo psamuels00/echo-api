@@ -93,12 +93,12 @@ class TestResponseTextExplicit(TestEchoServer):
 
 class TestResponseFile(TestEchoServer):
     def test_file_content(self):
-        self.case('http://127.0.0.1:5000/samples?_response=200 file:ok.txt',
-            200, RulesTemplate().load_file('ok.txt'))
+        self.case('http://127.0.0.1:5000/samples?_response=200 file:test/ok.txt',
+            200, RulesTemplate().load_file('test/ok.txt'))
 
     def test_file_content_with_trailing_newlines(self):
-        self.case('http://127.0.0.1:5000/samples?_response=200 file:trail_nl.txt',
-            200, RulesTemplate().load_file('trail_nl.txt'))
+        self.case('http://127.0.0.1:5000/samples?_response=200 file:test/trail_nl.txt',
+            200, RulesTemplate().load_file('test/trail_nl.txt'))
 
 
 class TestParameters(TestEchoServer):
@@ -118,25 +118,25 @@ class TestParameters(TestEchoServer):
 class TestParametersInFileName(TestEchoServer):
     def setUp(self):
         super().setUp()
-        self.expected_content = RulesTemplate('file:samples/get/green/Fido/74.json').resolve(
+        self.expected_content = RulesTemplate('file:test/samples/get/green/Fido/74.json').resolve(
             params=dict(id=74, color='green', age=7),
             json=Box({'pet': {'dog': {'name': 'Fido'}}})
         )
 
     def test_parameterized_file_name(self):
-        self.case('http://127.0.0.1:5000/samples/id:74?_response=200 file:samples/get/green/Fido/{id}.json',
+        self.case('http://127.0.0.1:5000/samples/id:74?_response=200 file:test/samples/get/green/Fido/{id}.json',
             200, self.expected_content)
 
     def test_other_parameterized_file_name(self):
-        self.case('http://127.0.0.1:5000/samples/id:74?_response=200 file:samples/get/{color}/Fido/74.json',
+        self.case('http://127.0.0.1:5000/samples/id:74?_response=200 file:test/samples/get/{color}/Fido/74.json',
             200, self.expected_content)
 
     def test_json_parameterized_file_name(self):
-        self.case('http://127.0.0.1:5000/samples/id:74?_response=200 file:samples/get/green/{json.pet.dog.name}/74.json',
+        self.case('http://127.0.0.1:5000/samples/id:74?_response=200 file:test/samples/get/green/{json.pet.dog.name}/74.json',
             200, self.expected_content)
 
     def test_all_types_of_param(self):
-        self.case('http://127.0.0.1:5000/samples/id:74?_response=200 file:samples/get/{color}/{json.pet.dog.name}/{id}.json',
+        self.case('http://127.0.0.1:5000/samples/id:74?_response=200 file:test/samples/get/{color}/{json.pet.dog.name}/{id}.json',
             200, self.expected_content)
 
 
@@ -251,27 +251,27 @@ class TestRuleMarkers(TestEchoServer):
 
 class TestNestedFiles(TestEchoServer):
     def test_simple_nested_response_files(self):
-        self.case('http://127.0.0.1:5000/samples?_response=200 file:kingdom/animalia.echo',
+        self.case('http://127.0.0.1:5000/samples?_response=200 file:test/kingdom/animalia.echo',
             200, "I'm a dog!\n")
 
     def test_match_param_on_nested_file(self):
-        self.case('http://127.0.0.1:5000/samples/id:72?_response=200 file:match_param.echo',
+        self.case('http://127.0.0.1:5000/samples/id:72?_response=200 file:test/match_param.echo',
             200, '{ "color": "green" }\n')
 
     def test_double_hop_matching(self):
-        self.case('http://127.0.0.1:5000/samples/id:72?_response=200 file:match_json.echo',
+        self.case('http://127.0.0.1:5000/samples/id:72?_response=200 file:test/match_json.echo',
             200, '{ "color": "green" }\n')
 
     def test_continue_after_no_match_on_nested_file(self):
-        self.case('http://127.0.0.1:5000/samples?_response=200 file:continue_after_no_match.echo',
+        self.case('http://127.0.0.1:5000/samples?_response=200 file:test/continue_after_no_match.echo',
             200, '{ "color": "green" }\n')
 
     def test_continue_after_no_match_on_nested_file_no_selector(self):
-        self.case('http://127.0.0.1:5000/samples?_response=200 file:no_match_file_first.echo',
+        self.case('http://127.0.0.1:5000/samples?_response=200 file:test/no_match_file_first.echo',
             200, 'ok\n')
 
     def test_no_rule_selected(self):
-        self.case('http://127.0.0.1:5000/samples?_response=200 file:no_match.echo',
+        self.case('http://127.0.0.1:5000/samples?_response=200 file:test/no_match.echo',
             200, '')
 
 
@@ -279,7 +279,7 @@ class TestBlankLines(TestEchoServer):
     def test_blank_line_before_rules(self):
         self.case('''http://127.0.0.1:5000/samples?_response=200
 
-                     file:no_match.echo
+                     file:test/no_match.echo
                      text:ok''',
             200, 'ok')
 
@@ -291,14 +291,14 @@ class TestBlankLines(TestEchoServer):
 
     def test_one_blank_line_after_file(self):
         self.case('''http://127.0.0.1:5000/samples?_response=200
-                     file:no_match.echo
+                     file:test/no_match.echo
 
                      text:ok''',
             200, 'ok')
 
     def test_two_blank_lines_after_file(self):
         self.case('''http://127.0.0.1:5000/samples?_response=200
-                     file:no_match.echo
+                     file:test/no_match.echo
 
 
                      text:ok''',
@@ -329,7 +329,7 @@ class TestComments(TestEchoServer):
 
     def test_comment_after_file_rule(self):
         self.case('''http://127.0.0.1:5000/samples?_response=200
-                     file:no_match.echo
+                     file:test/no_match.echo
                      %23 no match so far
                      text: got match?''',
             200, 'got match?')
@@ -351,21 +351,21 @@ class TestComments(TestEchoServer):
 
 class TestCommentsInFiles(TestEchoServer):
     def test_comments_in_file(self):
-        self.case('http://127.0.0.1:5000/samples?_response=200 file:comments.echo',
+        self.case('http://127.0.0.1:5000/samples?_response=200 file:test/comments.echo',
                   200, 'porcupine\n')
 
     def test_comment_before_rules_in_file(self):
-        self.case('http://127.0.0.1:5000/samples?_response=200 file:comment_before_rules.echo',
+        self.case('http://127.0.0.1:5000/samples?_response=200 file:test/comment_before_rules.echo',
                   200, 'the sky is blue\n')
 
     def test_comment_after_file_rule_in_file(self):
-        self.case('http://127.0.0.1:5000/samples?_response=200 file:comment_after_file.echo',
+        self.case('http://127.0.0.1:5000/samples?_response=200 file:test/comment_after_file.echo',
                   200, 'got match?\n')
 
     def test_comment_after_text_rule_in_file(self):
-        self.case('http://127.0.0.1:5000/samples?_response=200 file:comment_after_text.echo',
+        self.case('http://127.0.0.1:5000/samples?_response=200 file:test/comment_after_text.echo',
                   200, 'Bananas are fun.\n')
 
     def test_comment_in_middle_of_text_rule_in_file(self):
-        self.case('http://127.0.0.1:5000/samples?_response=200 file:comment_in_middle_of_text.echo',
+        self.case('http://127.0.0.1:5000/samples?_response=200 file:test/comment_in_middle_of_text.echo',
                   200, 'Bananas are fun.\nPeaches are fun too!\n')
