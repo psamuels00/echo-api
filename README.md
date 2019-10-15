@@ -1,6 +1,6 @@
 # Echo API
 
-Receive a request and return a response defined by parameters of the request.
+Receive a request and return a response defined by a parameter of the request.
 
 The response status code and content can be included in the request.  Various
 type of request parameters are recognized and may be used to select from
@@ -9,7 +9,9 @@ directly in the request, or in a file referenced by the request.
 
 The response specification is orthogonal in the sense that file content is
 interpreted like content included in the request: it may contain selection
-rules and nested file references.
+rules and nested file references.  Also, any part of the \_response or
+selection rules may include parameter references.  This means the status
+code and selection criteria may also be parameterized.
 
 A list of features with examples follows.
 
@@ -64,6 +66,7 @@ stops and a response is generated.  A final rule with no selection criteria serv
 default or catch-all.  Rules look something like this:
 
     | PATH: /.../ (text|file):...
+    | HEADER:foo /.../ (text|file):...
     | PARAM:foo /.../ (text|file):...
     | JSON:pet.dog.name /.../ (text|file):...
     | BODY: /.../ (text|file):...
@@ -76,6 +79,22 @@ For rules beginning on a new line, the vertical bar can be omitted.  For example
     PATH: /delete/ text: error
     PARAM:dog /fido|spot/ text: Hi {dog}
     text: OK
+
+## Fully Parameterized Response
+
+In addition to being used to select rules and define the response content, parameters
+and JSON fields may be used to define the status code and the selection criteria.  The
+following request, for example, may be used to simulate a 404 response:
+
+    http://127.0.0.1:5000/code:404?_response={code}
+
+The following requests all do the same thing:  when the parameter named "color"
+has a value that includes the word "green", the response content is "Go":
+
+    http://127.0.0.1:5000/type:PARAM?_response=200  {type}:color  /green/ Go
+    http://127.0.0.1:5000/param:color?_response=200 PARAM:{param} /green/ Go
+    http://127.0.0.1:5000/hue:green?_response=200   PARAM:color   /{hue}/ Go
+
 
 ## Formatting and Whitespace
 
@@ -139,15 +158,16 @@ For example:
 
 - Inline \_response content cannot contain '#' or '&'.  These characters must be encoded as %23 and %26 respectively.  (These characters are allowed in file content.)
 - Response content cannot contain lines beginning with '#' or whitespace followed by '#'.  This is true of inline \_response content as well as content stored in a file.
+- The template system is based on str.format(**args), so there are limits on the use of '{' and '}' in the response content.
 
 ## TODO
 - add error checking everywhere (including cirular file references), and add unit tests for each condition
-- add support for selection based on header values
-- add support for use as a library in addition to use as a service
-- add support for delay in response
-- allow override of status code with each rule (eg: PARAM: name /bob/ 404 file:samples/not_found)
 
 ## TODO maybe
+- add support for use as a library in addition to use as a service
+- add support for specifying a delay in the response (eg: _response=200 delay=30sec ...)
+- allow override of status code with each rule (eg: PARAM: name /bob/ 404 file:samples/not_found)
+- add support for /.../i to perform case-insensitive match
 - add support for an http location in addition to file and text
 - add wildcard support for parameters and JSON fields ("PARAM:\*" and "JSON:\*")
 - allow variation through a list of responses to be selected in order, round-robin, by a stateful echo server

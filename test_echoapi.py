@@ -9,6 +9,10 @@ import unittest
 
 class TestEchoServer(unittest.TestCase):
     def setUp(self):
+        self.headers = {
+            'authorization': 'Bearer Tutti-Frutti',
+            'team': 'Pirates',
+        }
         self.json = {
             'version': 23,
             'color': 'blue',
@@ -23,11 +27,14 @@ class TestEchoServer(unittest.TestCase):
             'age': 7,
         }
 
-    def case(self, url, expected_status_code, expected_content):
-        r = requests.get(url, json=self.json, params=self.params)
+    def case(self, url, expected_status_code, expected_content, expected_headers=None):
+        r = requests.get(url, headers=self.headers, json=self.json, params=self.params)
         content = r.content.decode("utf-8")
         self.assertEqual(r.status_code, expected_status_code, '(status code)')
         self.assertEqual(content, expected_content, '(content)')
+        if expected_headers:
+            for k, v in expected_headers.items():
+                self.assertEqual(r.headers[k], v)
 
 
 class TestSimpleResponse(TestEchoServer):
@@ -118,7 +125,9 @@ class TestParameters(TestEchoServer):
 class TestParametersInFileName(TestEchoServer):
     def setUp(self):
         super().setUp()
-        self.expected_content = RulesTemplate('file:test/samples/get/green/Fido/74.json').resolve(
+        file = 'file:test/samples/get/green/Fido/74.json'
+        self.expected_headers, self.status_code, self.expected_content = RulesTemplate(file).resolve(
+            headers=dict(),
             params=dict(id=74, color='green', age=7),
             json=Box({'pet': {'dog': {'name': 'Fido'}}})
         )
@@ -249,6 +258,28 @@ class TestRuleMarkers(TestEchoServer):
             200, '{ "color": "green" }')
 
 
+class TestParameterizeEverything(TestEchoServer):
+    def test_response_status_code_evaluated(self):
+        self.case('''http://127.0.0.1:5000/code:210?_response={code}
+                     text:gorilla''',
+            210, 'gorilla')
+
+    def test_selector_type_evaluated(self):
+        self.case('''http://127.0.0.1:5000/type:PARAM?_response=200
+                     {type}:color /green/ Yes, green''',
+            200, 'Yes, green')
+
+    def test_selector_target_evaluated(self):
+        self.case('''http://127.0.0.1:5000/param:color?_response=200
+                     PARAM:{param} /green/ Yes, green''',
+            200, 'Yes, green')
+
+    def test_match_pattern_evaluated(self):
+        self.case('''http://127.0.0.1:5000/alt:light-green?_response=200
+                     PARAM:alt /light-{color}/ Yes, lightgreen''',
+            200, 'Yes, lightgreen')
+
+
 class TestNestedFiles(TestEchoServer):
     def test_simple_nested_response_files(self):
         self.case('http://127.0.0.1:5000/samples?_response=200 file:test/kingdom/animalia.echo',
@@ -352,20 +383,81 @@ class TestComments(TestEchoServer):
 class TestCommentsInFiles(TestEchoServer):
     def test_comments_in_file(self):
         self.case('http://127.0.0.1:5000/samples?_response=200 file:test/comments.echo',
-                  200, 'porcupine\n')
+            200, 'porcupine\n')
 
     def test_comment_before_rules_in_file(self):
         self.case('http://127.0.0.1:5000/samples?_response=200 file:test/comment_before_rules.echo',
-                  200, 'the sky is blue\n')
+            200, 'the sky is blue\n')
 
     def test_comment_after_file_rule_in_file(self):
         self.case('http://127.0.0.1:5000/samples?_response=200 file:test/comment_after_file.echo',
-                  200, 'got match?\n')
+            200, 'got match?\n')
 
     def test_comment_after_text_rule_in_file(self):
         self.case('http://127.0.0.1:5000/samples?_response=200 file:test/comment_after_text.echo',
-                  200, 'Bananas are fun.\n')
+            200, 'Bananas are fun.\n')
 
     def test_comment_in_middle_of_text_rule_in_file(self):
         self.case('http://127.0.0.1:5000/samples?_response=200 file:test/comment_in_middle_of_text.echo',
-                  200, 'Bananas are fun.\nPeaches are fun too!\n')
+            200, 'Bananas are fun.\nPeaches are fun too!\n')
+
+
+class TestDefineHeadersInResponse(TestEchoServer):
+    def test_header_default_content_type(self):
+        expected_headers = { 'content-type': 'text/html; charset=utf-8' }
+        self.case('''http://127.0.0.1:5000/hdr?_response=200
+                     { "id": 4 }''',
+            200, '{ "id": 4 }', expected_headers)
+
+    def test_header_in_response(self):
+        expected_headers = { 'content-type': 'plain/text' }
+        self.case('''http://127.0.0.1:5000/hdr?_response=200
+                     HEADER: content-type: plain/text
+                     { "id": 4 }''',
+            200, '{ "id": 4 }', expected_headers)
+
+    def test_headers_in_response(self):
+        expected_headers = {
+            'content-type': 'plain/text',
+            'Genre': 'Classical',
+        }
+        self.case('''http://127.0.0.1:5000/hdr?_response=200
+                     HEADER: content-type: plain/text
+                     HEADER: Genre: Classical
+                     { "id": 4 }''',
+            200, '{ "id": 4 }', expected_headers)
+
+    def test_header_in_selected_response(self):
+        expected_headers = { 'Genre': 'Classical' }
+        self.case('''http://127.0.0.1:5000/hdr?_response=200
+                     PARAM:color /green/ HEADER: Genre: Classical
+                     { "id": 4 }''',
+            200, '{ "id": 4 }', expected_headers)
+
+    def test_header_in_selected_response_not_first(self):
+        self.case('''http://127.0.0.1:5000/hdr?_response=200
+                     PARAM:color /blue/ HEADER: Genre: Classical
+                     { "id": 4 }
+                     PARAM:color /green/ HEADER: Genre: Reggae
+                     { "id": 5 }''',
+            200, '{ "id": 5 }', { 'Genre': 'Reggae' })
+
+
+class TestSelectRuleByHeader(TestEchoServer):
+    def test_selection_by_header(self):
+        self.case('''http://127.0.0.1:5000/hdr?_response=200
+                     HEADER:Content-Type /binary/ no, binary
+                     HEADER:Content-Type /application.json/ yes, json response format''',
+            200, 'yes, json response format')
+
+
+class TestHeaderInResponseContent(TestEchoServer):
+    def test_include_header_in_response(self):
+        self.case('''http://127.0.0.1:5000/hdr?_response=200
+                     The "team" header is "{header.Team}"''',
+            200, 'The "team" header is "Pirates"')
+
+    def test_include_header_with_punctuation_in_response(self):
+        self.case('''http://127.0.0.1:5000/hdr?_response=200
+                     The "team" header is "{header.Content_Type}"''',
+            200, 'The "team" header is "application/json"')
