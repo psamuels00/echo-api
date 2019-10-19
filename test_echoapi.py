@@ -59,6 +59,8 @@ class TestSimpleResponse(TestEchoServer):
         self.case('http://127.0.0.1:5000/labs/Illuminati?_response=201 { "id": 4 }',
             201, '{ "id": 4 }')
 
+    # TODO use nonstandard status code
+
     def test_status_code_and_content_after_newline(self):
         self.case('''http://127.0.0.1:5000/labs/Illuminati?_response=
                      200
@@ -70,7 +72,7 @@ class TestSimpleResponse(TestEchoServer):
             200, '{ "id": 45, "date": null }')
 
     def test_plain_text_response(self):
-        text = "Doesn't need to be json.\nCould be multi-line."
+        text = r"Doesn't need to be json.\nCould be multi-line."
         self.case(f"http://127.0.0.1:5000/labs/Illuminati?_response=200 {text}",
             200, text)
 
@@ -356,7 +358,7 @@ class TestComments(TestEchoServer):
         self.case('''http://127.0.0.1:5000/samples?_response=200
                      %23 the sky is pretty
                      the sky is blue''',
-            200, '                     the sky is blue')
+            200, 'the sky is blue')
 
     def test_comment_after_file_rule(self):
         self.case('''http://127.0.0.1:5000/samples?_response=200

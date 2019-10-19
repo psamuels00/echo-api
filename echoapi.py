@@ -11,60 +11,29 @@ import re
 app = Flask(__name__)
 
 
-Rule = namedtuple('Rule', ['selector_type', 'selector_target', 'pattern', 'status_code', 'location', 'value'])
+Rule = namedtuple('Rule', [
+    'selector_type',
+    'selector_target',
+    'pattern',
+    'status_code',
+    'delay',
+    'location',
+    'headers',
+    'value'
+])
 
 
 class Rules:
 
     def __init__(self, text):
-        self.status_code = 200
-        self.rules = []
-        self.parse(text)
+        responseParser = ResponseParser()
+        self.status_code, self.delay, self.rules = responseParser.parse(text)
 
-    def get_response_lines(self, text):
-        # place newline after status code at beginning of text, if missing
-        text = re.sub(r'^\s*(\d{3})\s*(.*)', r'\1\n\2', text)
+        ruleParser = RulesParser()
+        ruleParser.parse(self.rules)
 
-        # remove one of [|@>] from beginning of text to avoid creating an extra blank line
-        # by the sub() command below
-        m = re.match(r'[|@>]\s*(.*)', text, re.DOTALL)
-        if m:
-            text = m.group(1)
-
-        # replace one of [|@>] with newline if it precedes a selector type or location specifier
-        multiline = re.sub(r'[|@>]\s*((HEADER|PATH|PARAM|JSON|BODY|text|file):)', r'\n\1', text)
-
-        lines = multiline.splitlines(keepends=True)
-        return lines
-
-    def parse(self, text):
-        lines = self.get_response_lines(text)
-        for line in lines:
-            if self.is_comment(line):
-                pass
-            elif self.is_status_code(line) and not self.rules:
-                self.status_code = int(line.strip())
-            elif self.is_matching_header_rule(line):
-                pass
-            elif self.is_matching_path_rule(line):
-                pass
-            elif self.is_matching_param_rule(line):
-                pass
-            elif self.is_matching_json_rule(line):
-                pass
-            elif self.is_matching_body_rule(line):
-                pass
-            elif self.is_matching_rule_with_explicit_location(line):
-                pass
-            elif self.rules and self.rules[-1].location == 'text':
-                # add to the content of the most recent rule, which is a text rule
-                rule = self.rules[-1]
-                rule.value.append(line)
-            elif self.is_blank(line):
-                # ignore blank lines before any rules or after a file rule
-                pass
-            else:
-                self.add_rule(None, None, None, 'text', line)
+    def num_rules(self):
+        return len(self.rules)
 
     def rule_selector_generator(self, headers, params, json):
         for rule in self.rules:
@@ -91,26 +60,51 @@ class Rules:
             if text and re.search(rule.pattern, text):
                 yield rule
 
+
+class ResponseParser:
+    def __init__(self):
+        self.status_code = 200   # global status code (preceding any rules)
+        self.delay = 0           # global delay (preceding any rules)
+        self.lines = None        # used by parse() for elements at beginning of line
+        self.rules = []          # returned by parse()
+
+    def parse(self, text):
+        self.lines = self.parse_response_into_lines(text)
+
+        while self.lines:
+            line = self.lines.pop(0)
+            self.parse_line(line)
+
+        return self.status_code, self.delay, self.rules
+
+    def parse_response_into_lines(self, text):
+        # remove one of [|@>] from beginning of text to avoid creating an extra blank line
+        # by the sub() command below
+        m = re.match(r'[|@>]\s*(.*)', text, re.DOTALL)
+        if m:
+            text = m.group(1)
+
+        # replace one of [|@>] with newline if it precedes a selector type or location specifier
+        multiline = re.sub(r'[|@>]\s*((HEADER|PATH|PARAM|JSON|BODY|text|file):)', r'\n\1', text)
+
+        return multiline.splitlines(keepends=True)
+
     def add_rule(self, selector_type, selector_target, pattern, location, value):
         location = location or 'text'
         status_code = self.status_code
+        delay = self.delay
+        headers = {}  # RulesParser moves entries from value to headers
+
         rule = Rule(
             selector_type,    # one of { PATH, PARAM, JSON, BODY, None }
             selector_target,  # eg: id, or sample.location.name
             pattern,          # any regular expression
             status_code,      # integer value
+            delay,            # integer representing seconds
             location,         # one of { text, file }
+            headers,          # dictionary of header values
             [value])          # arbitrary text
         self.rules.append(rule)
-
-    def is_comment(self, line):
-        return re.match(r'\s*#', line)
-
-    def is_blank(self, line):
-        return re.match(r'\s*$', line)
-
-    def is_status_code(self, line):
-        return re.match(r'\s*\d{3}\s*$', line)
 
     def add_rule_if_match(self, line, pattern, groups):
         m = re.match(pattern, line, re.DOTALL)
@@ -118,6 +112,55 @@ class Rules:
             args = [ m.group(n) if n else None
                      for n in groups ]
             self.add_rule(*args)
+            return True
+        return False
+
+    def parse_line(self, line):
+        if self.is_comment(line):
+            pass
+        elif not self.rules and self.begins_with_status_code(line):
+            pass
+        elif not self.rules and self.begins_with_delay(line):
+            pass
+        elif self.is_matching_header_rule(line):
+            pass
+        elif self.is_matching_path_rule(line):
+            pass
+        elif self.is_matching_param_rule(line):
+            pass
+        elif self.is_matching_json_rule(line):
+            pass
+        elif self.is_matching_body_rule(line):
+            pass
+        elif self.is_matching_rule_with_explicit_location(line):
+            pass
+        elif self.rules and self.rules[-1].location == 'text':
+            # add to the content of the most recent rule, which is a text rule
+            rule = self.rules[-1]
+            rule.value.append(line)
+        elif self.is_blank(line):
+            # ignore blank lines before any rules or after a file rule
+            pass
+        else:
+            # create a new implied text rule
+            self.add_rule(None, None, None, 'text', line)
+
+    def is_comment(self, line):
+        return re.match(r'\s*#', line)
+
+    def begins_with_status_code(self, line):
+        m = re.match(r'\s*(\d{3})\b\s*(.*)', line)
+        if m:
+            self.status_code = int(m.group(1))
+            self.lines.insert(0, m.group(2))
+            return True
+        return False
+
+    def begins_with_delay(self, line):
+        m = re.match(r'\s*delay\s*=(\d+)sec\b\s*(.*)', line)
+        if m:
+            self.delay = int(m.group(1))
+            self.lines.insert(0, m.group(2))
             return True
         return False
 
@@ -151,29 +194,80 @@ class Rules:
             r'\s*(text|file):\s*(.*)',
             (0,0,0,1,           2  ))
 
+    def is_blank(self, line):
+        return re.match(r'\s*$', line)
+
+
+class RulesParser:
+    def parse(self, rules):
+        for rule in rules:
+            self.parse_rule(rule)
+
+    def parse_rule(self, rule):
+        self.parse_rule_meta(rule)
+        self.parse_rule_content(rule)
+
+    def parse_rule_meta(self, rule):
+        while rule.value:
+            if not rule.headers and self.rule_begins_with_status_code(rule):
+                pass
+            elif not rule.headers and self.rule_begins_with_delay(rule):
+                pass
+            elif self.rule_is_response_header(rule):
+                pass
+            else:
+                break
+
+    def parse_rule_content(self, rule):
+        if rule.value:
+            rule.value[0] = rule.value[0].lstrip()
+
+    def rule_begins_with_status_code(self, rule):
+        m = re.match(r'\s*(\d{3})\b\s*(.*)', rule.value[0])
+        if m:
+            rule.status_code = int(m.group(1))
+            rule.value[0] = m.group(2)
+            return True
+        return False
+
+    def rule_begins_with_delay(self, rule):
+        m = re.match(r'\s*delay\s*=(\d+)sec\b\s*(.*)', rule.value[0])
+        if m:
+            rule.delay = int(m.group(1))
+            rule.value[0] = m.group(2)
+            return True
+        return False
+
+    def rule_is_response_header(self, rule):
+        m = re.match(r'\s*HEADER:\s*(.+)\s*:\s*(.*)', rule.value[0])
+        if m:
+            rule.headers[m.group(1)] = m.group(2)
+            rule.value.pop(0)
+            return True
+        return False
+
 
 class RulesTemplate:
 
     def __init__(self, text=''):
         self.text = text
 
-    def double_braces(self, string, reverse=False):
-        if reverse:
-            string = re.sub(r'{{([^\w])', r'{\1', string) # {{ not followed by word char is converted to {
-            string = re.sub(r'([^\w])}}', r'\1}', string) # }} not preceded by word char is converted to }
-        else:
+    def resolve_value(self, value, headers, params, json):
+        def double_braces(string):
             string = re.sub(r'{([^\w])', r'{{\1', string) # { not followed by word char is converted to {{
             string = re.sub(r'([^\w])}', r'\1}}', string) # } not preceded by word char is converted to }}
-        return string
-
-    def resolve_value(self, value, headers, params, json):
+            return string
+        def single_braces(string):
+            string = re.sub(r'{{([^\w])', r'{\1', string) # {{ not followed by word char is converted to {
+            string = re.sub(r'([^\w])}}', r'\1}', string) # }} not preceded by word char is converted to }
+            return string
         if headers or params or json:
             p = params.copy()
             p['json'] = json
             p['header'] = headers
-            value = self.double_braces(value)
+            value = double_braces(value)
             value = value.format(**p)
-            value = self.double_braces(value, reverse=True)
+            value = single_braces(value)
         return value
 
     def load_file(self, file):
@@ -182,52 +276,47 @@ class RulesTemplate:
             text = fh.read()
         return text
 
-    def extract_headers(self, status, content):
-        headers = {}
-
-        lines = content.splitlines(keepends=True)
-        while lines:
-            m = re.match('HEADER: (.*?)\s*:\s*(.*)', lines[0])
-            if not m:
-                break
-            headers[m.group(1)] = m.group(2)
-            lines.pop(0)
-            if lines:
-                lines[0] = lines[0].lstrip()
-
-        content = ''.join(lines)
-        return headers, status, content
-
     def resolve(self, headers, params, json):
         text = self.resolve_value(self.text, headers, params, json)
-        status, content = self.select_content(headers, params, json, text, level=0)
-        return self.extract_headers(status, content)
+        return self.select_content(text, headers, params, json, level=0)
 
     def resolve_file(self, headers, params, json, file, level):
-        # load and resolve the file contents
         text = self.load_file(file)
         text = self.resolve_value(text, headers, params, json)
+        return self.select_content(text, headers, params, json, level)
 
-        return self.select_content(headers, params, json, text, level)
-
-    def select_content(self, headers, params, json, text, level):
+    def select_content(self, text, headers, params, json, level):
         rules = Rules(text)
         rule_selector = rules.rule_selector_generator(headers, params, json)
 
-        status = rules.status_code
+        headers = {}
+        status = None
         content = None
+
+        if rules.num_rules() == 0:
+            status = rules.status_code
+            content = ''
+            # TODO return rules.delay
+            return headers, status, content
+
         while content is None:
             try:
                 rule = next(rule_selector)
 
                 # if the rule specifies a file, then recurse
                 # otherwise return the content
-                if not rule:
+                if not rule and rules.status_code:
+                    # TODO will we ever get here!?  ...if there are rules, but none match??
+                    # TODO add test with global status code and n>0 non-matching rules
+                    pass
+                elif not rule:
+                    # TODO will we ever get here!?
                     pass
                 elif rule.location == 'file':
                     file = rule.value[0].strip()
-                    status, content = self.resolve_file(headers, params, json, file, level + 1)
+                    headers, status, content = self.resolve_file(headers, params, json, file, level + 1)
                 else:
+                    headers = rule.headers
                     status = rule.status_code
                     content = ''.join(rule.value)
 
@@ -238,7 +327,8 @@ class RulesTemplate:
                     content = ''
                 break
 
-        return status, content
+        # TODO return the most recently parsed rule.delay
+        return headers, status, content
 
 
 class EchoServer:
@@ -298,6 +388,7 @@ class EchoServer:
 @app.route('/<path:text>', methods=['GET', 'POST', 'PUT', 'DELETE', 'HEAD'])
 def all_routes(text):
     server = EchoServer(text)
+    # TODO implement the delay functionality
     return server.response()
 
 
