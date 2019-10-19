@@ -303,16 +303,7 @@ class RulesTemplate:
             try:
                 rule = next(rule_selector)
 
-                # if the rule specifies a file, then recurse
-                # otherwise return the content
-                if not rule and rules.status_code:
-                    # TODO will we ever get here!?  ...if there are rules, but none match??
-                    # TODO add test with global status code and n>0 non-matching rules
-                    pass
-                elif not rule:
-                    # TODO will we ever get here!?
-                    pass
-                elif rule.location == 'file':
+                if rule.location == 'file':
                     file = rule.value[0].strip()
                     headers, status, content = self.resolve_file(headers, params, json, file, level + 1)
                 else:
