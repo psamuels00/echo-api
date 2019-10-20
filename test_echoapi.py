@@ -4,6 +4,7 @@ from box import Box
 from echoapi import RulesTemplate
 
 import requests
+import timeit
 import unittest
 
 
@@ -128,11 +129,15 @@ class TestParametersInFileName(TestEchoServer):
     def setUp(self):
         super().setUp()
         file = 'file:test/samples/get/green/Fido/74.json'
-        self.expected_headers, self.status_code, self.expected_content = RulesTemplate(file).resolve(
+        delay, headers, status, content = RulesTemplate(file).resolve(
             headers=dict(),
             params=dict(id=74, color='green', age=7),
             json=Box({'pet': {'dog': {'name': 'Fido'}}})
         )
+        self.expected_delay = delay
+        self.expected_headers = headers
+        self.expected_status_code = status
+        self.expected_content = content
 
     def test_parameterized_file_name(self):
         self.case('http://127.0.0.1:5000/samples/id:74?_response=200 file:test/samples/get/green/Fido/{id}.json',
@@ -155,6 +160,10 @@ class TestSelectionRules(TestEchoServer):
     def test_no_criteria(self):
         self.case('http://127.0.0.1:5000/it?_response=200 { "name": "foo" }',
             200, '{ "name": "foo" }')
+
+    def test_rule_with_file_content(self):
+        self.case('http://127.0.0.1:5000/it?_response=200 PARAM:color/green/file:test/ok.txt',
+            200, RulesTemplate().load_file('test/ok.txt'))
 
     def test_whitespace_in_rules(self):
         self.case('http://127.0.0.1:5000/it?_response=200 PARAM:color/green/Good', 200, 'Good')
@@ -463,3 +472,77 @@ class TestHeaderInResponseContent(TestEchoServer):
         self.case('''http://127.0.0.1:5000/hdr?_response=200
                      The "team" header is "{header.Content_Type}"''',
             200, 'The "team" header is "application/json"')
+
+
+class TestDelay(TestEchoServer):
+    def setUp(self):
+        super().setUp()
+
+    def delay_case(self, expected_delay, *args):
+        fun = lambda: self.case(*args)
+        duration = int(timeit.timeit(fun, number=1) * 1000)
+        self.assertGreaterEqual(duration, expected_delay)
+        self.assertLessEqual(duration, expected_delay + 50)
+
+    def test_global_delay_only(self):
+        self.delay_case(500, '''http://127.0.0.1:5000?_response=
+            delay=500ms PARAM:color /green/ fig''', 200, 'fig')
+
+    def test_rule_specific_delay_only(self):
+        self.delay_case(300, '''http://127.0.0.1:5000?_response=
+            PARAM:color /green/ delay=300ms fig''', 200, 'fig')
+
+    def test_global_and_rule_specific_delay(self):
+        self.delay_case(300, '''http://127.0.0.1:5000?_response=
+            delay=500ms PARAM:color /green/ delay=300ms fig''', 200, 'fig')
+
+    def test_rule_specific_with_file_contents(self):
+        self.delay_case(300, '''http://127.0.0.1:5000?_response=
+            PARAM:color /green/ delay=300ms file:test/delay/simple.echo''', 200, 'fig\n')
+
+    def test_global_delay_override_by_nested_rule(self):
+        self.delay_case(200, '''http://127.0.0.1:5000?_response=
+            delay=500ms file:test/delay/override.echo''', 200, 'mango\n')
+
+    def test_rule_specific_delay_override_by_nested_rule(self):
+        self.delay_case(200, '''http://127.0.0.1:5000?_response=
+            PARAM:color /green/ delay=500ms file:test/delay/override.echo''', 200, 'mango\n')
+
+    def test_override_nested_first_line(self):
+        self.delay_case(200, '''http://127.0.0.1:5000?_response=
+            delay=500ms file:test/delay/override_first_line.echo''', 200, 'mango\n')
+
+    def test_override_nested_global_for_selection(self):
+        self.delay_case(100, '''http://127.0.0.1:5000?_response=
+            delay=500ms file:test/delay/global_for_selection.echo''', 200, 'mango\n')
+
+    def test_override_in_selection(self):
+        self.delay_case(200, '''http://127.0.0.1:5000?_response=
+            delay=500ms file:test/delay/override_in_selection.echo''', 200, 'mango\n')
+
+    def test_override_of_non_matching_rules(self):
+        self.delay_case(100, '''http://127.0.0.1:5000?_response=
+            delay=100ms PARAM:color /blue/ delay=300ms fig
+            text:cherry''', 200, 'cherry')
+
+class TestStatusCodeOverrides(TestEchoServer):
+    def test_override_default_status_code_in_selection(self):
+        self.case('http://127.0.0.1:5000/it?_response=PARAM:color /green/ 201 mouse', 201, 'mouse')
+
+    def test_override_status_code_in_selection(self):
+        self.case('http://127.0.0.1:5000/it?_response=404 PARAM:color /green/ 201 mouse', 201, 'mouse')
+
+    def test_override_default_status_code_and_delay_in_selection(self):
+        self.case('http://127.0.0.1:5000/it?_response=PARAM:color /green/ 201 delay=10ms  mouse', 201, 'mouse')
+
+    def test_override_status_code_and_delay_in_selection(self):
+        self.case('http://127.0.0.1:5000/it?_response=404 delay=10ms PARAM:color /green/ 201 mouse', 201, 'mouse')
+
+    def test_override_status_code_in_nested_file(self):
+        self.case('''http://127.0.0.1:5000/it?_response=
+                     file:test/delay/override_status_code.echo''', 201, 'turkey\n')
+
+    def test_override_status_code_in_nested_file_selection(self):
+        self.case('''http://127.0.0.1:5000/it?_response=
+                     file:test/delay/override_status_code_in_selection.echo''', 201, 'turkey\n')
+

@@ -161,16 +161,17 @@ For example:
 - The template system is based on str.format(**args), so there are limits on the use of '{' and '}' in the response content.
 
 ## TODO
+- test semantics of status code and delay override with and without nested file references
+- finish testing various combinations of status code and/or delay, including with nested files
 - add error checking everywhere (including cirular file references), and add unit tests for each condition
 
 ## TODO maybe
 - add support for use as a library in addition to use as a service
-- add support for specifying a delay in the response (eg: _response=200 delay=30sec ...)
-- allow override of status code with each rule (eg: PARAM: name /bob/ 404 file:samples/not_found)
 - add support for /.../i to perform case-insensitive match
+- add support for !/.../ to perform negative match
 - add support for an http location in addition to file and text
 - add wildcard support for parameters and JSON fields ("PARAM:\*" and "JSON:\*")
-- allow variation through a list of responses to be selected in order, round-robin, by a stateful echo server
+- allow variation through a list of responses to be selected in order, round-robin, by a stateful echo server.  useful for testing retry logic and messages moving to dlq
 - optimization: cache file contents and maybe resolved instances
 - optimization: precompile all the static regular expressions
 
