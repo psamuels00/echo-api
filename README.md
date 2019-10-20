@@ -161,8 +161,6 @@ For example:
 - The template system is based on str.format(**args), so there are limits on the use of '{' and '}' in the response content.
 
 ## TODO
-- test semantics of status code and delay override with and without nested file references
-- finish testing various combinations of status code and/or delay, including with nested files
 - add error checking everywhere (including cirular file references), and add unit tests for each condition
 
 ## TODO maybe
@@ -171,7 +169,7 @@ For example:
 - add support for !/.../ to perform negative match
 - add support for an http location in addition to file and text
 - add wildcard support for parameters and JSON fields ("PARAM:\*" and "JSON:\*")
-- allow variation through a list of responses to be selected in order, round-robin, by a stateful echo server.  useful for testing retry logic and messages moving to dlq
+- allow a list of response values to be defined, to be returned in round-robin order by a stateful echo server, useful to test eg move of sqs message to dlq
 - optimization: cache file contents and maybe resolved instances
 - optimization: precompile all the static regular expressions
 
