@@ -30,9 +30,6 @@ class Rules:
         responseParser = ResponseParser(default_status_code, default_delay)
         self.status_code, self.delay, self.rules = responseParser.parse(text)
 
-        rulesAdjuster = RulesAdjuster()
-        rulesAdjuster.adjust(self.rules)
-
     def num_rules(self):
         return len(self.rules)
 
@@ -75,6 +72,9 @@ class ResponseParser:
         while self.lines:
             line = self.lines.pop(0)
             self.parse_line(line)
+
+        rulesAdjuster = RulesAdjuster()
+        rulesAdjuster.adjust(self.rules)
 
         return self.status_code, self.delay, self.rules
 
