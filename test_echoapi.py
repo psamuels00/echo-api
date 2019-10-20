@@ -60,8 +60,6 @@ class TestSimpleResponse(TestEchoServer):
         self.case('http://127.0.0.1:5000/labs/Illuminati?_response=201 { "id": 4 }',
             201, '{ "id": 4 }')
 
-    # TODO use nonstandard status code
-
     def test_status_code_and_content_after_newline(self):
         self.case('''http://127.0.0.1:5000/labs/Illuminati?_response=
                      200
