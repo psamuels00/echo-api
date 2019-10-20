@@ -33,6 +33,29 @@ class Rules:
     def num_rules(self):
         return len(self.rules)
 
+    def matches(self, text, rule_pattern):
+        # set case-sensitive flag
+        flags = 0
+        if rule_pattern[-1] == 'i':
+            flags = re.IGNORECASE
+
+        # determine match polarity
+        is_positive = True
+        if rule_pattern[0] == '!':
+            is_positive = False
+
+        # parse pattern text from pattern spec, eg: parse "dog" from "!/dog/i"
+        pattern = re.sub(r'.*/(.*)/.*', r'\1', rule_pattern)
+
+        got_match = False
+        text_match = re.search(pattern, text, flags)
+        if is_positive and text_match:
+            got_match = True
+        elif not is_positive and not text_match:
+            got_match = True
+
+        return got_match
+
     def rule_selector_generator(self, headers, params, json):
         for rule in self.rules:
             if rule.selector_type is None:
@@ -41,38 +64,27 @@ class Rules:
             if rule.selector_type == 'HEADER':
                 header_name = rule.selector_target
                 text = headers.get(header_name, '')
+
             elif rule.selector_type == 'PATH':
                 text = request.path
+
             elif rule.selector_type == 'PARAM':
                 param_name = rule.selector_target
                 text = params.get(param_name, '')
+
             elif rule.selector_type == 'JSON':
                 json_path = rule.selector_target
                 fmt = '{json.' + json_path + '}'
                 text = fmt.format(json=json)
+
             elif rule.selector_type == 'BODY':
                 body = request.get_data().decode()
                 text = body
+
             else:
                 continue
 
-            # set case-sensitive flag
-            flags = 0
-            if rule.pattern[-1] == 'i':
-                flags = re.IGNORECASE
-
-            # determine match polarity
-            is_positive = True
-            if rule.pattern[0] == '!':
-                is_positive = False
-
-            # parse pattern text from pattern spec, eg: parse "dog" from "!/dog/i"
-            pattern = re.sub(r'.*/(.*)/.*', r'\1', rule.pattern)
-
-            match = re.search(pattern, text, flags)
-            if is_positive and match:
-                yield rule
-            elif not is_positive and not match:
+            if self.matches(text, rule.pattern):
                 yield rule
 
 
