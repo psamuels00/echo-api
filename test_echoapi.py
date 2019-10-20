@@ -473,9 +473,6 @@ class TestHeaderInResponseContent(TestEchoServer):
 
 
 class TestDelay(TestEchoServer):
-    def setUp(self):
-        super().setUp()
-
     def delay_case(self, expected_delay, *args):
         fun = lambda: self.case(*args)
         duration = int(timeit.timeit(fun, number=1) * 1000)
@@ -523,6 +520,7 @@ class TestDelay(TestEchoServer):
             delay=100ms PARAM:color /blue/ delay=300ms fig
             text:cherry''', 200, 'cherry')
 
+
 class TestStatusCodeOverrides(TestEchoServer):
     def test_override_default_status_code_in_selection(self):
         self.case('http://127.0.0.1:5000/it?_response=PARAM:color /green/ 201 mouse', 201, 'mouse')
@@ -543,4 +541,31 @@ class TestStatusCodeOverrides(TestEchoServer):
     def test_override_status_code_in_nested_file_selection(self):
         self.case('''http://127.0.0.1:5000/it?_response=
                      file:test/delay/override_status_code_in_selection.echo''', 201, 'turkey\n')
+
+
+class TestMatchingOptions(TestEchoServer):
+    def test_case_sensitive_match(self):
+        self.case('''http://127.0.0.1:5000/?_response=200
+                     PARAM:color /GREEN/ case-insensitive match
+                     PARAM:color /green/ case-sensitive match''',
+            200, 'case-sensitive match')
+
+    def test_case_insensitive_match(self):
+        self.case('''http://127.0.0.1:5000/?_response=200
+                     PARAM:color /GREEN/i case-insensitive match
+                     PARAM:color /green/ case-sensitive match''',
+            200, 'case-insensitive match\n')
+
+    def test_positive_match(self):
+        self.case('''http://127.0.0.1:5000/?_response=200
+                     PARAM:color /blue/ blue birds
+                     PARAM:color /green/ bingo''',
+            200, 'bingo')
+
+    def test_negative_match(self):
+        self.case('''http://127.0.0.1:5000/?_response=200
+                     PARAM:color !/e/    not e
+                     PARAM:color !/blue/ blue birds
+                     PARAM:color /green/ never get here''',
+            200, 'blue birds\n')
 

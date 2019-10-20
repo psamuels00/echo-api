@@ -38,7 +38,6 @@ class Rules:
             if rule.selector_type is None:
                 yield rule
 
-            text = None
             if rule.selector_type == 'HEADER':
                 header_name = rule.selector_target
                 text = headers.get(header_name, '')
@@ -54,8 +53,26 @@ class Rules:
             elif rule.selector_type == 'BODY':
                 body = request.get_data().decode()
                 text = body
+            else:
+                continue
 
-            if text and re.search(rule.pattern, text):
+            # set case-sensitive flag
+            flags = 0
+            if rule.pattern[-1] == 'i':
+                flags = re.IGNORECASE
+
+            # determine match polarity
+            is_positive = True
+            if rule.pattern[0] == '!':
+                is_positive = False
+
+            # parse pattern text from pattern spec, eg: parse "dog" from "!/dog/i"
+            pattern = re.sub(r'.*/(.*)/.*', r'\1', rule.pattern)
+
+            match = re.search(pattern, text, flags)
+            if is_positive and match:
+                yield rule
+            elif not is_positive and not match:
                 yield rule
 
 
@@ -90,32 +107,6 @@ class ResponseParser:
 
         return multiline.splitlines(keepends=True)
 
-    def add_rule(self, selector_type, selector_target, pattern, status_code, delay, location, value):
-        status_code = self.status_code if status_code is None else int(status_code)
-        delay = self.delay if delay is None else int(delay)
-        location = location or 'text'
-        headers = {}  # RulesAdjuster moves entries from value to headers
-
-        rule = Rule(
-            selector_type,    # one of { PATH, PARAM, JSON, BODY, None }
-            selector_target,  # eg: id, or sample.location.name
-            pattern,          # any regular expression
-            status_code,      # integer HTTP response code
-            delay,            # integer representing milliseconds
-            location,         # one of { text, file }
-            headers,          # dictionary of header values
-            [value])          # arbitrary text
-        self.rules.append(rule)
-
-    def add_rule_if_match(self, line, pattern, groups):
-        m = re.match(pattern, line, re.DOTALL)
-        if m:
-            args = [ m.group(n) if n else None
-                     for n in groups ]
-            self.add_rule(*args)
-            return True
-        return False
-
     def parse_line(self, line):
         if self.is_comment(line):
             pass
@@ -145,6 +136,33 @@ class ResponseParser:
         else:
             self.add_rule_with_implied_text_location(line)
 
+    def add_rule(self, selector_type, selector_target, pattern, status_code, delay, location, value):
+
+        status_code = self.status_code if status_code is None else int(status_code)
+        delay = self.delay if delay is None else int(delay)
+        location = location or 'text'
+        headers = {}  # RulesAdjuster moves entries from value to headers
+
+        rule = Rule(
+            selector_type,    # one of { PATH, PARAM, JSON, BODY, None }
+            selector_target,  # eg: id, or sample.location.name
+            pattern,          # any regular expression
+            status_code,      # integer HTTP response code
+            delay,            # integer representing milliseconds
+            location,         # one of { text, file }
+            headers,          # dictionary of header values
+            [value])          # arbitrary text
+        self.rules.append(rule)
+
+    def add_rule_if_match(self, line, pattern, groups):
+        m = re.match(pattern, line, re.DOTALL)
+        if m:
+            args = [ m.group(n) if n else None
+                     for n in groups ]
+            self.add_rule(*args)
+            return True
+        return False
+
     def is_comment(self, line):
         return re.match(r'\s*#', line)
 
@@ -166,28 +184,28 @@ class ResponseParser:
 
     def is_matching_header_rule(self, line):
         return self.add_rule_if_match(line,
-            r'\s*(HEADER):\s*(.+?)\s*/(.*?)/\s*((\d{3})\b\s*)?(delay=(\d+)ms\s*)?((text|file):)?\s*(.*)',
-            (    1,          2,       3,        5,                   7,           9,               10  ))
+            r'\s*(HEADER):\s*(.+?)\s*(!?/.*?/i?)\s*((\d{3})\b\s*)?(delay=(\d+)ms\s*)?((text|file):)?\s*(.*)',
+            (    1,          2,      3,             5,                   7,           9,               10  ))
 
     def is_matching_path_rule(self, line):
         return self.add_rule_if_match(line,
-            r'\s*(PATH):\s*/(.*?)/\s*((\d{3})\b\s*)?(delay=(\d+)ms\s*)?((text|file):)?\s*(.*)',
-            (    1,     0,  2,        4,                   6,           8,               9   ))
+            r'\s*(PATH):\s*(!?/.*?/i?)\s*((\d{3})\b\s*)?(delay=(\d+)ms\s*)?((text|file):)?\s*(.*)',
+            (    1,     0, 2,             4,                   6,           8,               9   ))
 
     def is_matching_param_rule(self, line):
         return self.add_rule_if_match(line,
-            r'\s*(PARAM):\s*(.+?)\s*/(.*?)/\s*((\d{3})\b\s*)?(delay=(\d+)ms\s*)?((text|file):)?\s*(.*)',
-            (    1,         2,       3,        5,                   7,           9,               10  ))
+            r'\s*(PARAM):\s*(.+?)\s*(!?/.*?/i?)\s*((\d{3})\b\s*)?(delay=(\d+)ms\s*)?((text|file):)?\s*(.*)',
+            (    1,         2,      3,             5,                   7,           9,               10  ))
 
     def is_matching_json_rule(self, line):
         return self.add_rule_if_match(line,
-            r'\s*(JSON):\s*(.+?)\s*/(.*?)/\s*((\d{3})\b\s*)?(delay=(\d+)ms\s*)?((text|file):)?\s*(.*)',
-            (    1,        2,       3,        5,                   7,           9,               10  ))
+            r'\s*(JSON):\s*(.+?)\s*(!?/.*?/i?)\s*((\d{3})\b\s*)?(delay=(\d+)ms\s*)?((text|file):)?\s*(.*)',
+            (    1,        2,      3,             5,                   7,           9,               10  ))
 
     def is_matching_body_rule(self, line):
         return self.add_rule_if_match(line,
-            r'\s*(BODY):\s*/(.*?)/\s*((\d{3})\b\s*)?(delay=(\d+)ms\s*)?((text|file):)?\s*(.*)',
-            (    1,     0,  2,        4,                   6,           8,               9   ))
+            r'\s*(BODY):\s*(!?/.*?/i?)\s*((\d{3})\b\s*)?(delay=(\d+)ms\s*)?((text|file):)?\s*(.*)',
+            (    1,     0, 2,             4,                   6,           8,               9   ))
 
     def is_matching_rule_with_explicit_location(self, line):
         return self.add_rule_if_match(line,

@@ -159,17 +159,29 @@ For example:
 - Inline \_response content cannot contain '#' or '&'.  These characters must be encoded as %23 and %26 respectively.  (These characters are allowed in file content.)
 - Response content cannot contain lines beginning with '#' or whitespace followed by '#'.  This is true of inline \_response content as well as content stored in a file.
 - The template system is based on str.format(**args), so there are limits on the use of '{' and '}' in the response content.
+- Newlines not allowed in the middle of a selection rule line (see TODO below)
 
 ## TODO
 - add error checking everywhere (including cirular file references), and add unit tests for each condition
+- check for security of allowing any expression in the content
+- update documentation above for status and delay, and nesting/override semantics, and summarize where newlines are allowed/required, and document case insensitive and negation flags
 
 ## TODO maybe
 - add support for use as a library in addition to use as a service
-- add support for /.../i to perform case-insensitive match
-- add support for !/.../ to perform negative match
 - add support for an http location in addition to file and text
 - add wildcard support for parameters and JSON fields ("PARAM:\*" and "JSON:\*")
 - allow a list of response values to be defined, to be returned in round-robin order by a stateful echo server, useful to test eg move of sqs message to dlq
 - optimization: cache file contents and maybe resolved instances
 - optimization: precompile all the static regular expressions
+- for more orthogonality, allow newlines anywhere in a rule (after selector type,
+  selector target, pattern, status code, delay, or location)
+  currently allowed
+      before and after global status code
+      before and after global delay
+      before rules
+      after file rules
+  currently required
+      before HEADER, PATH, PARAM, JSON, or BODY selector type
+  but we want it allowed here too:
+      <selector-type> <selector-target> /<pattern>/ <status-code> delay=<delay>ms <location>:<value>
 
