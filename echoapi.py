@@ -480,6 +480,15 @@ def reset():
     return 'ok'
 
 
+@app.route('/_echo_list_rules', methods=['GET'])
+def list_rules(): # for debugging
+    keys = Rules.rule_match_count.keys()
+    for k in sorted(keys):
+        v = Rules.rule_match_count[k]
+        print(f'@@@ {v:5} {k}')
+    return 'ok'
+
+
 if __name__ == '__main__':
     app.run()
 
