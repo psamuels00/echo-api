@@ -9,7 +9,7 @@ directly in the request, or in a file referenced by the request.
 
 The response specification is orthogonal in the sense that file content is
 interpreted like content included in the request: it may contain selection
-rules and nested file references.  Also, any part of the \_response or
+rules and nested file references.  Also, any part of the \_echo_response or
 selection rules may include parameter references.  This means the status
 code and selection criteria may also be parameterized.
 
@@ -20,42 +20,42 @@ A list of features with examples follows.
 
 Return the same static response to all requests.  For example:
 
-    http://127.0.0.1:5000/samples?_response=200 { "id": 45, "validation_date": null }
+    http://127.0.0.1:5000/samples?_echo_response=200 { "id": 45, "validation_date": null }
 
 ## Named Path Parameters
 
 Recognize multiple, named parameters in the url path and render them in the response.
 For example:
 
-    http://127.0.0.1:5000/samples/id:{id}/lab:{lab}?_response=200 { "id": {id}, "lab": "{lab}" }
+    http://127.0.0.1:5000/samples/id:{id}/lab:{lab}?_echo_response=200 { "id": {id}, "lab": "{lab}" }
 
 ## Response Files
 
 Allow response to come from a file treated as a template wrt the named parameters.
 str.format(\*\*data) is used as the templating system.  For example:
 
-    http://127.0.0.1:5000/samples/id:{id}?_response=200 file:samples/get/response.json
+    http://127.0.0.1:5000/samples/id:{id}?_echo_response=200 file:samples/get/response.json
 
 ## Map of Responses
 
 Allow response file to be selected by one or more named parameters.  For example:
 
-    http://127.0.0.1:5000/samples/id:{id}?_response=200 file:samples/get/{id}.json
+    http://127.0.0.1:5000/samples/id:{id}?_echo_response=200 file:samples/get/{id}.json
 
 ## Other URL Parameters
 
 Capture parameters in the URL other than those in the request path that may be used to
 resolve and/or select the response template.  This includes URL parameters supplied in
-addition to \_response.  For example:
+addition to \_echo_response.  For example:
 
-    http://127.0.0.1:5000/samples/{id}?_response=200 file:samples/get/color/{color}.json
+    http://127.0.0.1:5000/samples/{id}?_echo_response=200 file:samples/get/color/{color}.json
 
 ## JSON in the Request Body
 
 Provide access to fields in a json object in the body of the request that may be used to
 resolve and/or select the response template.  For example:
 
-    http://127.0.0.1:5000/samples/{id}?_response=200 text:{ "group": { "name": "{json.group.name}" } }
+    http://127.0.0.1:5000/samples/{id}?_echo_response=200 text:{ "group": { "name": "{json.group.name}" } }
 
 ## Selection Rules
 
@@ -86,14 +86,14 @@ In addition to being used to select rules and define the response content, param
 and JSON fields may be used to define the status code and the selection criteria.  The
 following request, for example, may be used to simulate a 404 response:
 
-    http://127.0.0.1:5000/code:404?_response={code}
+    http://127.0.0.1:5000/code:404?_echo_response={code}
 
 The following requests all do the same thing:  when the parameter named "color"
 has a value that includes the word "green", the response content is "Go":
 
-    http://127.0.0.1:5000/type:PARAM?_response=200  {type}:color  /green/ Go
-    http://127.0.0.1:5000/param:color?_response=200 PARAM:{param} /green/ Go
-    http://127.0.0.1:5000/hue:green?_response=200   PARAM:color   /{hue}/ Go
+    http://127.0.0.1:5000/type:PARAM?_echo_response=200  {type}:color  /green/ Go
+    http://127.0.0.1:5000/param:color?_echo_response=200 PARAM:{param} /green/ Go
+    http://127.0.0.1:5000/hue:green?_echo_response=200   PARAM:color   /{hue}/ Go
 
 
 ## Formatting and Whitespace
@@ -117,7 +117,7 @@ Blank lines following a text rule are considered part of the response content, w
 blank lines following a file rule are ignored.  Spaces may be added to the rules to
 make them more readable. For example:
 
-    http://127.0.0.1:5000/samples?_response=200
+    http://127.0.0.1:5000/samples?_echo_response=200
         PATH:       /\b100\d{3}/   file:samples/get/100xxx.json
 
         PARAM:name         /bob/   file:samples/get/bob.json
@@ -159,10 +159,10 @@ a comment line in the response content.  A file may look like this, for example:
     PARAM:id /70/  { "group": "fruit" }
     PARAM:id /71/  { "group": "vegetable" }
 
-When included directly in the \_response parameter, '#' must be encoded as %23.
+When included directly in the \_echo_response parameter, '#' must be encoded as %23.
 For example:
 
-    http://127.0.0.1:5000/samples?_response=200
+    http://127.0.0.1:5000/samples?_echo_response=200
         %23 comment before rules
         PARAM:name  /bob/  file:samples/get/bob.json
         %23 another comment
@@ -170,8 +170,8 @@ For example:
 
 ## Limitations
 
-- Inline \_response content cannot contain '#' or '&'.  These characters must be encoded as %23 and %26 respectively.  (These characters are allowed in file content.)
-- Response content cannot contain lines beginning with '#' or whitespace followed by '#'.  This is true of inline \_response content as well as content stored in a file.
+- Inline \_echo_response content cannot contain '#' or '&'.  These characters must be encoded as %23 and %26 respectively.  (These characters are allowed in file content.)
+- Response content cannot contain lines beginning with '#' or whitespace followed by '#'.  This is true of inline \_echo_response content as well as content stored in a file.
 - The template system is based on str.format(**args), so there are limits on the use of '{' and '}' in the response content.
 - Newlines not allowed in the middle of a selection rule line (see TODO below)
 
@@ -184,7 +184,6 @@ For example:
 
 ## TODO
 
-- rename _response to _echo_response
  add option to reset the echo server, to clear cache, eg: _echo_cmd=reset
 - add error checking everywhere (including cirular file references), and add unit tests for each condition
 - make sure we do not remove space from first line of content read from a file that contains only content, and add test for this

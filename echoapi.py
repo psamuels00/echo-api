@@ -72,7 +72,7 @@ class Rules:
         print(f'\n@@@  {offset}  [{rule_id}]')
 
         return Rule(
-            rule.rule_source,      # file that rule comes from, or '' if directly from _response param value
+            rule.rule_source,      # file that rule comes from, or '' if directly from _echo_response param value
             selector_type,         # one of { PATH, PARAM, JSON, BODY, None }
             selector_target,       # eg: id, or sample.location.name
             pattern,               # any regular expression
@@ -119,7 +119,7 @@ class Rules:
 
 class ResponseParser:
     def __init__(self, rule_source, status_code, delay):
-        self.rule_source = rule_source  # file that rule comes from, or '' if directly from _response param value
+        self.rule_source = rule_source  # file that rule comes from, or '' if directly from _echo_response param value
         self.status_code = status_code  # default status code (global default, inherited, or preceding any rules)
         self.delay = delay              # default status code (global default, inherited, or preceding any rules)
         self.lines = None               # used by parse() for elements at beginning of line
@@ -190,7 +190,7 @@ class ResponseParser:
             selector_target = ''
 
         rule = Rule(
-            rule_source,      # file that rule comes from, or '' if directly from _response param value
+            rule_source,      # file that rule comes from, or '' if directly from _echo_response param value
             selector_type,    # one of { PATH, PARAM, JSON, BODY, None }
             selector_target,  # eg: id, or sample.location.name
             pattern,          # any regular expression
@@ -436,8 +436,8 @@ class EchoServer:
                 self.path_params[name] = content
 
     def parse_response_parameter(self):
-        self._response = request.args.get('_response', '')
-        self.content = self._response.lstrip()
+        echo_response = request.args.get('_echo_response', '')
+        self.content = echo_response.lstrip()
 
     def parse_json_body(self):
         self.json = None  # Box of json object from the request body
