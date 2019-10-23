@@ -69,7 +69,6 @@ class Rules:
         match_count = self.rule_match_count.get(rule_id, 0)
         offset = match_count % len(rule.value)
         self.rule_match_count[rule_id] = match_count + 1
-        print(f'\n@@@  {offset}  [{rule_id}]')
 
         return Rule(
             rule.rule_source,      # file that rule comes from, or '' if directly from _echo_response param value
@@ -473,6 +472,12 @@ def all_routes(text):
 @app.route('/', methods=['GET', 'POST', 'PUT', 'DELETE', 'HEAD'])
 def root_path():
     return all_routes('/')
+
+
+@app.route('/_echo_reset', methods=['GET'])
+def reset():
+    Rules.rule_match_count.clear()
+    return 'ok'
 
 
 if __name__ == '__main__':

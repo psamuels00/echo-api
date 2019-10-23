@@ -38,6 +38,11 @@ class TestEchoServer(unittest.TestCase):
                 self.assertEqual(r.headers[k], v)
 
 
+def setUpModule():
+    # reset the echo server, needed by TestMultipleResponses
+    requests.get('http://127.0.0.1:5000/_echo_reset')
+
+
 class TestSimpleResponse(TestEchoServer):
     def test_content_only(self):
         self.case('http://127.0.0.1:5000/labs/Illuminati?_echo_response={ "id": 4 }',
@@ -604,5 +609,3 @@ class TestMultipleResponses(TestEchoServer):
         self.case(url, 200, '                 fish')
         self.case(url, 200, '                 insect\n')
 
-    # TODO test multiple response content in files
-    # TODO test multiple response content based on matching selection criteria
