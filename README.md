@@ -183,12 +183,11 @@ For example:
 - update to describe the option to reset the echo server, to clear the cache, ie: using path _echo_reset
 - improve the Formatting and Whitespace section
 
-## TODO for sure
+## TODO
 
 - add tests for multiple content options read from file, including nested files
-- add error checking everywhere (including cirular file references), and add unit tests for each condition
 - allow first line of selected content to be lstripped the same as for standard content
-- request sequence is relative to the path + selector_type +..., but it should not include parameter values from the path (eg: /id:22 should include only /id)
+- add error checking everywhere (including cirular file references), and add unit tests for each condition
 
 ## TODO maybe
 

@@ -639,3 +639,30 @@ class TestMultipleResponses(TestEchoServer):
         self.case(url, 200, '                     alpha\n')
         self.case(url, 200, '                     beta\n')
         self.case(url, 200, '                     delta', alt_color='purple')
+
+    def test_multiple_response_selected_content_by_path_param(self):
+        url = '''http://127.0.0.1:5000/test/case/4/kolor:{}?_echo_response=200
+                 PARAM:kolor /green/
+                     --[ 1 ]--
+                     alpha
+                     --[ 2 ]--
+                     beta
+                 PARAM:kolor /beige/
+                      --[ 1 ]--
+                     gamma
+                     --[ 2 ]--
+                     delta'''
+        green_url = url.format('green')
+        beige_url = url.format('beige')
+        self.case(green_url, 200, '                     alpha\n')
+        self.case(green_url, 200, '                     beta\n')
+        self.case(beige_url, 200, '                     gamma\n')
+        self.case(beige_url, 200, '                     delta')
+
+        self.case(green_url, 200, '                     alpha\n')
+        self.case(beige_url, 200, '                     gamma\n')
+        self.case(green_url, 200, '                     beta\n')
+        self.case(green_url, 200, '                     alpha\n')
+        self.case(green_url, 200, '                     beta\n')
+        self.case(beige_url, 200, '                     delta')
+
