@@ -1,0 +1,11 @@
+PARAM:color /green/
+--[ 1 ]--
+alpha
+--[ 2 ]--
+beta
+#
+PARAM:color /purple/
+--[ 1 ]--
+gamma
+--[ 2 ]--
+delta

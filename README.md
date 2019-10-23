@@ -179,13 +179,13 @@ For example:
 
 - update for status and delay, including nesting/override semantics
 - update to include case insensitive and negation flags on the pattern
-- update to describe list of response content and header to be returned in round-robin order, relative to path + selector_type + selector_target + pattern
-- update to describe the option to reset the echo server, to clear the cache, ie: using path _echo_reset
+- update to describe list of response content and header to be returned in round-robin order, relative to path without param values + selector type + selector target + pattern
+- update to describe /_echo_reset to reset the echo server and clear the cache
+- update to describe /_echo_list_rules for debugging
 - improve the Formatting and Whitespace section
 
 ## TODO
 
-- add tests for multiple content options read from file, including nested files
 - add error checking everywhere (including cirular file references), and add unit tests for each condition
 
 ## TODO maybe

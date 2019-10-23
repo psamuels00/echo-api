@@ -666,3 +666,23 @@ class TestMultipleResponses(TestEchoServer):
         self.case(green_url, 200, 'beta\n')
         self.case(beige_url, 200, 'delta')
 
+    def test_multiple_response_from_file(self):
+        url = 'http://127.0.0.1:5000/test/case/5/?_echo_response=200 file:test/multi_content.echo'
+        self.case(url, 200, 'peanuts\n')
+        self.case(url, 200, 'cashews\n')
+        self.case(url, 200, 'peanuts\n')
+        self.case(url, 200, 'cashews\n')
+
+    def test_multiple_response_selected_content_from_file(self):
+        url = 'http://127.0.0.1:5000/test/case/5/?_echo_response=200 file:test/multi_select_content.echo'
+        self.case(url, 200, 'alpha\n')
+        self.case(url, 200, 'beta\n')
+        self.case(url, 200, 'gamma\n', alt_color='purple')
+        self.case(url, 200, 'delta\n', alt_color='purple')
+
+        self.case(url, 200, 'alpha\n')
+        self.case(url, 200, 'gamma\n', alt_color='purple')
+        self.case(url, 200, 'beta\n')
+        self.case(url, 200, 'alpha\n')
+        self.case(url, 200, 'beta\n')
+        self.case(url, 200, 'delta\n', alt_color='purple')
