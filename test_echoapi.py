@@ -423,7 +423,7 @@ class TestDefineHeadersInResponse(TestEchoServer):
         self.case('''http://127.0.0.1:5000/hdr?_response=200
                      HEADER: content-type: plain/text
                      { "id": 4 }''',
-            200, '{ "id": 4 }', expected_headers)
+            200, '                     { "id": 4 }', expected_headers)
 
     def test_headers_in_response(self):
         expected_headers = {
@@ -434,14 +434,14 @@ class TestDefineHeadersInResponse(TestEchoServer):
                      HEADER: content-type: plain/text
                      HEADER: Genre: Classical
                      { "id": 4 }''',
-            200, '{ "id": 4 }', expected_headers)
+            200, '                     { "id": 4 }', expected_headers)
 
     def test_header_in_selected_response(self):
         expected_headers = { 'Genre': 'Classical' }
         self.case('''http://127.0.0.1:5000/hdr?_response=200
                      PARAM:color /green/ HEADER: Genre: Classical
                      { "id": 4 }''',
-            200, '{ "id": 4 }', expected_headers)
+            200, '                     { "id": 4 }', expected_headers)
 
     def test_header_in_selected_response_not_first(self):
         self.case('''http://127.0.0.1:5000/hdr?_response=200
@@ -449,7 +449,7 @@ class TestDefineHeadersInResponse(TestEchoServer):
                      { "id": 4 }
                      PARAM:color /green/ HEADER: Genre: Reggae
                      { "id": 5 }''',
-            200, '{ "id": 5 }', { 'Genre': 'Reggae' })
+            200, '                     { "id": 5 }', { 'Genre': 'Reggae' })
 
 
 class TestSelectRuleByHeader(TestEchoServer):
@@ -569,3 +569,40 @@ class TestMatchingOptions(TestEchoServer):
                      PARAM:color /green/ never get here''',
             200, 'blue birds\n')
 
+
+class TestMultipleResponses(TestEchoServer):
+    def test_two_responses_alternating(self):
+        url = '''http://127.0.0.1:5000/test/case/1/?_response=200
+                 --[ 1 ]--
+                 peanuts
+                 --[ 2 ]--
+                 cashews'''
+        self.case(url, 200, '                 peanuts\n')
+        self.case(url, 200, '                 cashews')
+        self.case(url, 200, '                 peanuts\n')
+        self.case(url, 200, '                 cashews')
+
+    def test_any_sequence_number(self):
+        url = '''http://127.0.0.1:5000/test/case/2/?_response=200
+                 --[ 0 ]--
+                 peanuts
+                 --[ 0 ]--
+                 cashews'''
+        self.case(url, 200, '                 peanuts\n')
+        self.case(url, 200, '                 cashews')
+
+    def test_three_responses_alternating(self):
+        url = '''http://127.0.0.1:5000/test/case/3/?_response=200
+                 --[ 0 ]--
+                 insect
+                 --[ 0 ]--
+                 bird
+                 --[ 0 ]--
+                 fish'''
+        self.case(url, 200, '                 insect\n')
+        self.case(url, 200, '                 bird\n')
+        self.case(url, 200, '                 fish')
+        self.case(url, 200, '                 insect\n')
+
+    # TODO test multiple response content in files
+    # TODO test multiple response content based on matching selection criteria

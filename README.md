@@ -98,13 +98,20 @@ has a value that includes the word "green", the response content is "Go":
 
 ## Formatting and Whitespace
 
+Newlines or one of the makers described above are required before any of the selectors
+(HEADER, PATH, PARAM, JSON, or BODY)
+
 The vertical bars may be included in environments where it is hard to insert newlines
 into the value, or to define multiple rules on a single line.  The at symbol (@) and
 greater than symbol (>) can also be used like the vertical bar.  For example, the
-following lines are equivalent to the rules specification above:
+following lines are equivalent to the rules specification in #Selection Rules above:
 
     200 | PATH: /delete/ text: error | PARAM:dog /fido|spot/ text: Hi {dog} | text: OK
     200 > PATH: /delete/ text: error > PARAM:dog /fido|spot/ text: Hi {dog} > text: OK
+
+Spaces are ignored at the beginning of any line in the rules specification with one
+exception.  If the content of a rule spans multiple lines, spaces are only removed
+from the first line.  They are copied verbatim on subsequent lines.
 
 Blank lines following a text rule are considered part of the response content, whereas
 blank lines following a file rule are ignored.  Spaces may be added to the rules to
@@ -120,6 +127,13 @@ make them more readable. For example:
         JSON:pet.pig.name  /Sue/   file:samples/get/piggie.json
 
                                    file:samples/get/response.json
+
+Newlines are allowed in the following places
+- before and after global status code
+- before and after global delay
+- before text and file rules
+- after file rules
+
 
 ## Comments
 
@@ -161,27 +175,29 @@ For example:
 - The template system is based on str.format(**args), so there are limits on the use of '{' and '}' in the response content.
 - Newlines not allowed in the middle of a selection rule line (see TODO below)
 
+## TODO documentation
+
+- update for status and delay, including nesting/override semantics
+- update to include case insensitive and negation flags on the pattern
+- update to describe list of response content and header to be returned in round-robin order
+- streamline Formatting and Whitespace section
+
 ## TODO
+
+- rename _response to _echo_response
+ add option to reset the echo server, to clear cache, eg: _echo_cmd=reset
 - add error checking everywhere (including cirular file references), and add unit tests for each condition
-- check for security of allowing any expression in the content
-- update documentation above for status and delay, and nesting/override semantics, and summarize where newlines are allowed/required, and document case insensitive and negation flags
+- make sure we do not remove space from first line of content read from a file that contains only content, and add test for this
+- better testing of the multiple content option
 
 ## TODO maybe
-- add support for use as a library in addition to use as a service
+
 - add support for an http location in addition to file and text
-- add wildcard support for parameters and JSON fields ("PARAM:\*" and "JSON:\*")
-- allow a list of response values to be defined, to be returned in round-robin order by a stateful echo server, useful to test eg move of sqs message to dlq
-- optimization: cache file contents and maybe resolved instances
-- optimization: precompile all the static regular expressions
-- for more orthogonality, allow newlines anywhere in a rule (after selector type,
-  selector target, pattern, status code, delay, or location)
-  currently allowed
-      before and after global status code
-      before and after global delay
-      before rules
-      after file rules
-  currently required
-      before HEADER, PATH, PARAM, JSON, or BODY selector type
-  but we want it allowed here too:
-      <selector-type> <selector-target> /<pattern>/ <status-code> delay=<delay>ms <location>:<value>
+- add support for use as a library in addition to use as a service
+- add option for a user id (eg: _echo_id=psamuels/healthalgo-tracking-api) to set up a shared echo server
+- optimize by cacheing file contents as unresolved templates (and maybe the resolved instances too??)
+- optimize by precompiling all the static regular expressions, like EchoServer.param_pat
+- allow newlines anywhere in a rule (after selector type, selector target, pattern, status code, delay, or location)
+- add wildcard support for parameters and JSON fields (ie: "PARAM:\*" and "JSON:\*")
+- check for security of allowing any expression in the content which will be evaluated via str.format()
 
