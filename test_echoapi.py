@@ -8,6 +8,11 @@ import timeit
 import unittest
 
 
+def setUpModule():
+    # reset the echo server, needed by TestMultipleResponses
+    requests.get('http://127.0.0.1:5000/_echo_reset')
+
+
 class TestEchoServer(unittest.TestCase):
     def setUp(self):
         self.headers = {
@@ -28,19 +33,19 @@ class TestEchoServer(unittest.TestCase):
             'age': 7,
         }
 
-    def case(self, url, expected_status_code, expected_content, expected_headers=None):
-        r = requests.get(url, headers=self.headers, json=self.json, params=self.params)
+    def case(self, url, expected_status_code, expected_content, expected_headers=None, alt_color=None):
+        params = self.params.copy()
+        if alt_color is not None:
+            params['color'] = alt_color
+
+        r = requests.get(url, headers=self.headers, json=self.json, params=params)
         content = r.content.decode("utf-8")
+
         self.assertEqual(r.status_code, expected_status_code, '(status code)')
         self.assertEqual(content, expected_content, '(content)')
         if expected_headers:
             for k, v in expected_headers.items():
                 self.assertEqual(r.headers[k], v)
-
-
-def setUpModule():
-    # reset the echo server, needed by TestMultipleResponses
-    requests.get('http://127.0.0.1:5000/_echo_reset')
 
 
 class TestSimpleResponse(TestEchoServer):
@@ -588,7 +593,7 @@ class TestMultipleResponses(TestEchoServer):
         self.case(url, 200, '                 cashews')
 
     def test_three_responses_alternating_any_sequence_number(self):
-        url = '''http://127.0.0.1:5000/test/case/3/?_echo_response=200
+        url = '''http://127.0.0.1:5000/test/case/2/?_echo_response=200
                  --[ 0 ]--
                  insect
                  --[ 0 ]--
@@ -600,3 +605,26 @@ class TestMultipleResponses(TestEchoServer):
         self.case(url, 200, '                 fish')
         self.case(url, 200, '                 insect\n')
 
+    def test_multiple_response_selected_content(self):
+        url = '''http://127.0.0.1:5000/test/case/3/?_echo_response=200
+                 PARAM:color /green/
+                     --[ 1 ]--
+                     alpha
+                     --[ 2 ]--
+                     beta
+                 PARAM:color /purple/
+                      --[ 1 ]--
+                     gamma
+                     --[ 2 ]--
+                     delta'''
+        self.case(url, 200, '                     alpha\n')
+        self.case(url, 200, '                     beta\n')
+        self.case(url, 200, '                     gamma\n', alt_color='purple')
+        self.case(url, 200, '                     delta', alt_color='purple')
+
+        self.case(url, 200, '                     alpha\n')
+        self.case(url, 200, '                     gamma\n', alt_color='purple')
+        self.case(url, 200, '                     beta\n')
+        self.case(url, 200, '                     alpha\n')
+        self.case(url, 200, '                     beta\n')
+        self.case(url, 200, '                     delta', alt_color='purple')

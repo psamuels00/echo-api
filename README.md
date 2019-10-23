@@ -185,7 +185,7 @@ For example:
 
 ## TODO for sure
 
-- better testing of the multiple content option, including file content and multiple responses based on matching selection criteria
+- add tests for multiple content options read from file, including nested files
 - add error checking everywhere (including cirular file references), and add unit tests for each condition
 - make sure we do not remove space from first line of content read from a file that contains only content, and add test for this
 
@@ -193,6 +193,7 @@ For example:
 
 - add support for an http location in addition to file and text
 - add support for use as a library in addition to use as a service
+- request sequence is relative to the path + selector_type +..., but it should not include parameter values from the path (eg: /id:22 should include only /id)
 - add option for a user id (eg: _echo_id=psamuels/healthalgo-tracking-api) to set up a shared echo server
 - optimize by cacheing file contents as unresolved templates (and maybe the resolved instances too??)
 - optimize by precompiling all the static regular expressions, like EchoServer.param_pat
