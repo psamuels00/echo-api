@@ -186,7 +186,6 @@ For example:
 ## TODO
 
 - add tests for multiple content options read from file, including nested files
-- allow first line of selected content to be lstripped the same as for standard content
 - add error checking everywhere (including cirular file references), and add unit tests for each condition
 
 ## TODO maybe

@@ -433,7 +433,7 @@ class TestDefineHeadersInResponse(TestEchoServer):
         self.case('''http://127.0.0.1:5000/hdr?_echo_response=200
                      HEADER: content-type: plain/text
                      { "id": 4 }''',
-            200, '                     { "id": 4 }', expected_headers)
+            200, '{ "id": 4 }', expected_headers)
 
     def test_headers_in_response(self):
         expected_headers = {
@@ -444,14 +444,14 @@ class TestDefineHeadersInResponse(TestEchoServer):
                      HEADER: content-type: plain/text
                      HEADER: Genre: Classical
                      { "id": 4 }''',
-            200, '                     { "id": 4 }', expected_headers)
+            200, '{ "id": 4 }', expected_headers)
 
     def test_header_in_selected_response(self):
         expected_headers = { 'Genre': 'Classical' }
         self.case('''http://127.0.0.1:5000/hdr?_echo_response=200
                      PARAM:color /green/ HEADER: Genre: Classical
                      { "id": 4 }''',
-            200, '                     { "id": 4 }', expected_headers)
+            200, '{ "id": 4 }', expected_headers)
 
     def test_header_in_selected_response_not_first(self):
         self.case('''http://127.0.0.1:5000/hdr?_echo_response=200
@@ -459,7 +459,7 @@ class TestDefineHeadersInResponse(TestEchoServer):
                      { "id": 4 }
                      PARAM:color /green/ HEADER: Genre: Reggae
                      { "id": 5 }''',
-            200, '                     { "id": 5 }', { 'Genre': 'Reggae' })
+            200, '{ "id": 5 }', { 'Genre': 'Reggae' })
 
 
 class TestSelectRuleByHeader(TestEchoServer):
@@ -598,10 +598,10 @@ class TestMultipleResponses(TestEchoServer):
                  peanuts
                  --[ 2 ]--
                  cashews'''
-        self.case(url, 200, '                 peanuts\n')
-        self.case(url, 200, '                 cashews')
-        self.case(url, 200, '                 peanuts\n')
-        self.case(url, 200, '                 cashews')
+        self.case(url, 200, 'peanuts\n')
+        self.case(url, 200, 'cashews')
+        self.case(url, 200, 'peanuts\n')
+        self.case(url, 200, 'cashews')
 
     def test_three_responses_alternating_any_sequence_number(self):
         url = '''http://127.0.0.1:5000/test/case/2/?_echo_response=200
@@ -611,10 +611,10 @@ class TestMultipleResponses(TestEchoServer):
                  bird
                  --[ 0 ]--
                  fish'''
-        self.case(url, 200, '                 insect\n')
-        self.case(url, 200, '                 bird\n')
-        self.case(url, 200, '                 fish')
-        self.case(url, 200, '                 insect\n')
+        self.case(url, 200, 'insect\n')
+        self.case(url, 200, 'bird\n')
+        self.case(url, 200, 'fish')
+        self.case(url, 200, 'insect\n')
 
     def test_multiple_response_selected_content(self):
         url = '''http://127.0.0.1:5000/test/case/3/?_echo_response=200
@@ -628,17 +628,17 @@ class TestMultipleResponses(TestEchoServer):
                      gamma
                      --[ 2 ]--
                      delta'''
-        self.case(url, 200, '                     alpha\n')
-        self.case(url, 200, '                     beta\n')
-        self.case(url, 200, '                     gamma\n', alt_color='purple')
-        self.case(url, 200, '                     delta', alt_color='purple')
+        self.case(url, 200, 'alpha\n')
+        self.case(url, 200, 'beta\n')
+        self.case(url, 200, 'gamma\n', alt_color='purple')
+        self.case(url, 200, 'delta', alt_color='purple')
 
-        self.case(url, 200, '                     alpha\n')
-        self.case(url, 200, '                     gamma\n', alt_color='purple')
-        self.case(url, 200, '                     beta\n')
-        self.case(url, 200, '                     alpha\n')
-        self.case(url, 200, '                     beta\n')
-        self.case(url, 200, '                     delta', alt_color='purple')
+        self.case(url, 200, 'alpha\n')
+        self.case(url, 200, 'gamma\n', alt_color='purple')
+        self.case(url, 200, 'beta\n')
+        self.case(url, 200, 'alpha\n')
+        self.case(url, 200, 'beta\n')
+        self.case(url, 200, 'delta', alt_color='purple')
 
     def test_multiple_response_selected_content_by_path_param(self):
         url = '''http://127.0.0.1:5000/test/case/4/kolor:{}?_echo_response=200
@@ -654,15 +654,15 @@ class TestMultipleResponses(TestEchoServer):
                      delta'''
         green_url = url.format('green')
         beige_url = url.format('beige')
-        self.case(green_url, 200, '                     alpha\n')
-        self.case(green_url, 200, '                     beta\n')
-        self.case(beige_url, 200, '                     gamma\n')
-        self.case(beige_url, 200, '                     delta')
+        self.case(green_url, 200, 'alpha\n')
+        self.case(green_url, 200, 'beta\n')
+        self.case(beige_url, 200, 'gamma\n')
+        self.case(beige_url, 200, 'delta')
 
-        self.case(green_url, 200, '                     alpha\n')
-        self.case(beige_url, 200, '                     gamma\n')
-        self.case(green_url, 200, '                     beta\n')
-        self.case(green_url, 200, '                     alpha\n')
-        self.case(green_url, 200, '                     beta\n')
-        self.case(beige_url, 200, '                     delta')
+        self.case(green_url, 200, 'alpha\n')
+        self.case(beige_url, 200, 'gamma\n')
+        self.case(green_url, 200, 'beta\n')
+        self.case(green_url, 200, 'alpha\n')
+        self.case(green_url, 200, 'beta\n')
+        self.case(beige_url, 200, 'delta')
 

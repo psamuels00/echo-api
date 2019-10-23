@@ -290,10 +290,6 @@ class RulesAdjuster:
         rule.value.clear()
         rule.value.append(content)    # [content1, content2,...]
 
-        # remove whitespace before first line of content, unless it is from a file
-        if not self.is_from_file and len(lines) > 0:
-            lines[0] = lines[0].lstrip()
-
         blanks_only = True
         for line in lines:
             if self.is_content_selector(line):
@@ -314,6 +310,9 @@ class RulesAdjuster:
             elif blanks_only and self.is_blank_line(line):
                 pass
             else:
+                # remove whitespace before first line of content, unless it is from a file
+                if len(content) == 0 and not self.is_from_file:
+                    line = line.lstrip()
                 content.append(line)
                 blanks_only = False
 
