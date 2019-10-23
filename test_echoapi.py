@@ -587,16 +587,7 @@ class TestMultipleResponses(TestEchoServer):
         self.case(url, 200, '                 peanuts\n')
         self.case(url, 200, '                 cashews')
 
-    def test_any_sequence_number(self):
-        url = '''http://127.0.0.1:5000/test/case/2/?_echo_response=200
-                 --[ 0 ]--
-                 peanuts
-                 --[ 0 ]--
-                 cashews'''
-        self.case(url, 200, '                 peanuts\n')
-        self.case(url, 200, '                 cashews')
-
-    def test_three_responses_alternating(self):
+    def test_three_responses_alternating_any_sequence_number(self):
         url = '''http://127.0.0.1:5000/test/case/3/?_echo_response=200
                  --[ 0 ]--
                  insect
