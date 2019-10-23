@@ -131,7 +131,8 @@ class ResponseParser:
             line = self.lines.pop(0)
             self.parse_line(line)
 
-        rulesAdjuster = RulesAdjuster()
+        is_from_file = False if self.rule_source == '' else True
+        rulesAdjuster = RulesAdjuster(is_from_file)
         rulesAdjuster.adjust(self.rules)
 
         return self.status_code, self.delay, self.rules
@@ -260,8 +261,8 @@ class ResponseParser:
 
     def add_rule_with_implied_text_location(self, line):
         return self.add_rule_if_match(line,
-            r'\s*((\d{3})\b\s*)?(delay=(\d+)ms\s*)?\s*(.*)',
-            (0,0,0,2,                  4,          0, 5   ))
+            r'(\s*(\d{3})\b)?(\s*delay=(\d+)ms)?(.*)',
+            (0,0,0,2,                  4,    0, 5   ))
 
     def is_blank(self, line):
         return re.match(r'\s*$', line)
@@ -272,6 +273,9 @@ class RulesAdjuster:
     blank_line_pat = re.compile(r'\s*$')
     content_selector_pat = re.compile(r'\s*--\[\s*(\d*)\s*\]--\s*$')
     header_line_pat = re.compile(r'\s*HEADER:\s*(.+)\s*:\s*(.*)')
+
+    def __init__(self, is_from_file):
+        self.is_from_file = is_from_file
 
     def adjust(self, rules):
         for rule in rules:
@@ -286,8 +290,8 @@ class RulesAdjuster:
         rule.value.clear()
         rule.value.append(content)    # [content1, content2,...]
 
-        # remove whitespace before first line of content
-        if len(lines) > 0:
+        # remove whitespace before first line of content, unless it is from a file
+        if not self.is_from_file and len(lines) > 0:
             lines[0] = lines[0].lstrip()
 
         blanks_only = True

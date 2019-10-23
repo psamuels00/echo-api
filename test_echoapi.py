@@ -580,6 +580,17 @@ class TestMatchingOptions(TestEchoServer):
             200, 'blue birds\n')
 
 
+class TestSpaceRemoval(TestEchoServer):
+    def test_space_removal_on_first_line_of_text_content(self):
+        self.case('''http://127.0.0.1:5000/?_echo_response=200
+                     trimmed, like hedges''',
+            200, 'trimmed, like hedges')
+
+    def test_retain_space_on_first_line_of_file_content(self):
+        self.case('http://127.0.0.1:5000/?_echo_response=200 file:test/beginning_with_space.echo',
+            200, '    Four spaces.\nThen none.\n')
+
+
 class TestMultipleResponses(TestEchoServer):
     def test_two_responses_alternating(self):
         url = '''http://127.0.0.1:5000/test/case/1/?_echo_response=200
