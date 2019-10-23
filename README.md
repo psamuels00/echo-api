@@ -186,7 +186,7 @@ For example:
 
 ## TODO
 
-- add error checking everywhere (including cirular file references), and add unit tests for each condition
+- add error checking *everywhere* (including cirular file references), and add unit tests for each condition
 
 ## TODO maybe
 
