@@ -7,80 +7,139 @@ type of request parameters are recognized and may be used to select from
 multiple options of content to be returned.  Response content may be defined
 directly in the request, or in a file referenced by the request.
 
+<span style="color: orange">**TODO**</span> _Update the remainder of this section._
+
 The response specification is orthogonal in the sense that file content is
 interpreted like content included in the request: it may contain selection
 rules and nested file references.  Also, any part of the \_echo_response or
 selection rules may include parameter references.  This means the status
-code and selection criteria may also be parameterized.
+code, delay, and selection criteria may also be parameterized.
 
-A list of features with examples follows.
+A list of features with examples follows.  In the examples, the \_echo_response
+values are shown unencoded for readability.  For actual use, they should be
+uri encoded.
 
 
-## Static Response
+## Minimal Usage
 
-Return the same static response to all requests.  For example:
+The minimal usage returns 200 and empty contents:
 
-    http://127.0.0.1:5000/samples?_echo_response=200 { "id": 45, "validation_date": null }
+    http://127.0.0.1:5000/?_echo_response=
+
+
+## Static Content
+
+Return the same static response to all requests.  The content to return can
+be any arbitrary text.  For example:
+
+    http://127.0.0.1:5000/?_echo_response=same ol'
+
+
+## Status Code
+
+Return a status code different than 200, the default.  For example:
+
+    http://127.0.0.1:5000/?_echo_response=201 created ok
+
+
+## Delay
+
+Wait for some number of milliseconds before responding to request.  For example:
+
+    http://127.0.0.1:5000/?_echo_response=200 delay=5000ms ok, eventually
+
+
+## Template Content
+
+The response content is actually a template that may include named parameters or json
+fields in the request body.  To echo back the name of a "color" parameter, for example:
+
+    http://127.0.0.1:5000/?color=aqua&_echo_response=200 { "color": "{color}" }
+
 
 ## Named Path Parameters
 
 Recognize multiple, named parameters in the url path and render them in the response.
 For example:
 
-    http://127.0.0.1:5000/samples/id:{id}/lab:{lab}?_echo_response=200 { "id": {id}, "lab": "{lab}" }
+    http://127.0.0.1:5000/id:{id}/lab:{lab}?_echo_response=200 { "id": {id}, "lab": "{lab}" }
+
 
 ## Response Files
 
 Allow response to come from a file treated as a template wrt the named parameters.
 str.format(\*\*data) is used as the templating system.  For example:
 
-    http://127.0.0.1:5000/samples/id:{id}?_echo_response=200 file:samples/get/response.json
+    http://127.0.0.1:5000/id:{id}?_echo_response=200 file:samples/get/response.json
 
-## Map of Responses
+
+## Response Maps
 
 Allow response file to be selected by one or more named parameters.  For example:
 
-    http://127.0.0.1:5000/samples/id:{id}?_echo_response=200 file:samples/get/{id}.json
+    http://127.0.0.1:5000/id:{id}?_echo_response=200 file:samples/get/{id}.json
 
-## Other URL Parameters
 
-Capture parameters in the URL other than those in the request path that may be used to
-resolve and/or select the response template.  This includes URL parameters supplied in
+## Text Content
+
+Any content not explicitly defined as file content is assumed to be text
+content, but this can be made explicit.  For example
+
+    http://127.0.0.1:5000/?_echo_response=200 text:Explicit now
+
+
+## Other Parameters
+
+Capture parameters in the request other than those in the path that may be used to
+resolve and/or select the response template.  This includes parameters supplied in
 addition to \_echo_response.  For example:
 
-    http://127.0.0.1:5000/samples/{id}?_echo_response=200 file:samples/get/color/{color}.json
+    http://127.0.0.1:5000/?_echo_response=200 file:samples/get/color/{color}.json
 
-## JSON in the Request Body
+
+## JSON in the Body
 
 Provide access to fields in a json object in the body of the request that may be used to
 resolve and/or select the response template.  For example:
 
-    http://127.0.0.1:5000/samples/{id}?_echo_response=200 text:{ "group": { "name": "{json.group.name}" } }
+    http://127.0.0.1:5000/{id}?_echo_response=200 { "group": { "name": "{json.group.name}" } }
+
 
 ## Selection Rules
 
-Allow response content to be selected based on regex matching of the path, parameters, or
-a value in the body of a request.  Any number of selection rules may be included for a
-response.  The rules are processed in order.  When the first match is made, processing
-stops and a response is generated.  A final rule with no selection criteria serves as a
-default or catch-all.  Rules look something like this:
+Allow response content to be selected based on regex matching of the path, headers,
+parameters, a json field, or a value in the body of a request.  Selection rules
+begin with a selector type and must appear on a new line.  They look like this:
 
-    | PATH: /.../ (text|file):...
-    | HEADER:foo /.../ (text|file):...
-    | PARAM:foo /.../ (text|file):...
-    | JSON:pet.dog.name /.../ (text|file):...
-    | BODY: /.../ (text|file):...
-    | (text|file):...
+    PATH: /.../ (text|file):...
+    HEADER:foo /.../ (text|file):...
+    PARAM:foo /.../ (text|file):...
+    JSON:pet.dog.name /.../ (text|file):...
+    BODY: /.../ (text|file):...
 
-The ellipses in /.../ indicate a regular expression.  The vertical bars are optional.
-For rules beginning on a new line, the vertical bar can be omitted.  For example:
+The ellipses in /.../ indicate a regular expression.  See #Pattern Matching Flags below.
 
-    200
+Any number of selection rules may be included for a response.  The rules are
+processed in order.  When the first match is made, processing stops and a
+response is generated.
+
+A final rule with no selection criteria serves as a default or catch-all.
+For example, the following rules specification returns one of 3 values:
+
     PATH: /delete/ text: error
     PARAM:dog /fido|spot/ text: Hi {dog}
     text: OK
 
-## Fully Parameterized Response
+
+## Rule-Specific Overrides
+
+The status and delay can both be defined specifically for a rule to
+override the default or global value described above.  For example:
+
+<span style="color: orange">**TODO example**</span>
+
+
+## Template Rules Spec
 
 In addition to being used to select rules and define the response content, parameters
 and JSON fields may be used to define the status code and the selection criteria.  The
@@ -88,36 +147,125 @@ following request, for example, may be used to simulate a 404 response:
 
     http://127.0.0.1:5000/code:404?_echo_response={code}
 
-The following requests all do the same thing:  when the parameter named "color"
-has a value that includes the word "green", the response content is "Go":
+To exaggerate the point, the following requests all do the same thing:  when the
+parameter named "color" has a value that includes the word "green", the response
+content is "Go":
 
     http://127.0.0.1:5000/type:PARAM?_echo_response=200  {type}:color  /green/ Go
     http://127.0.0.1:5000/param:color?_echo_response=200 PARAM:{param} /green/ Go
     http://127.0.0.1:5000/hue:green?_echo_response=200   PARAM:color   /{hue}/ Go
 
 
+## Pattern Matching Flags
+
+Two flags are supported on the regular expressions:
+- An i at the end of the pattern means case-insensitive
+- An ! at the beginning of the pattern means to negate the polarity of the match
+
+For example:
+
+    PARAM:color  /GREEN/i   text:GrEeN, in any case
+    PARAM:color  !/GREEN/   text:Not GREEN
+    PARAM:color  !/GREEN/i  text:Not gReEn, in any case
+
+
+## Nested Templates
+
+The contents of a text file may contain a single text template,
+or it may contain a complete rules specification, the same format
+as the \_echo_response parameter.
+
+If a file is processed and no matches are made (and therefore, no
+content to be returned), we continue looking for more rules
+to apply.  For example:
+
+    PARAM:fname  /bob/    file:nomatches.echo
+    PARAM:lname  /smith/  file:stillnomatches.echo
+                          text:no match
+
+...or more simply: <span style="color: orange">Make sure this is tested.</span>
+
+    file:nomatches.echo
+    file:stillnomatches.echo
+    text:no match
+
+There is no limit to the number of file references that may be
+followed.  Each time a rule with file content is selected, the
+contents of the file are loaded, treated as a template and
+resolved, and then parsed as a rules specification.  This
+continues until some unqualified text is defined for return,
+or, after all rules have been excluded, an empty string.
+
+
+## Nesting Semantics
+
+<span style="color: orange">There is a heirarchy of global and rule-specific, and nested files, so explain the nesting semantics: basically we override as we define more specifically on a rule, or in a file.  And a rule-specific setting for a file content and the same settings at the top of the file are two ways to do the same thing, the latter overriting the former if defined.</span>
+
+
+## Sequenced Responses
+
+In addition to a single response content value, a list of values may be defined.
+In this case, a single value is selected each time there is a match on the rule.
+To select a value, we cycle through the list on successive matches.  For example:
+
+    --[ 1 ]--
+    return this on 1st call, 3rd call, etc
+    --[ 2 ]--
+    return this on 2nd call, 4th call, etc
+
+The actual number used in the sequence header makes no difference:
+
+    --[ 0 ]--
+    odd calls
+    --[ 0 ]--
+    even calls
+
+We can cycle through files like this:
+<span style="color: orange">Make sure this is tested.</span>
+
+    --[ 0 ]--
+    file:events/seq1.echo
+    --[ 0 ]--
+    file:events/seq2.echo
+
+
+For the purpose of determining how many times a rule has been matched,
+each rule is uniquely identified by a combination of
+- the path, including named path parameters, but not the actual value
+  (eg, "/sample/id" for "/sample/id:27"),
+- the rule source, either the name of a file or '' for inline text content
+- the selector type (ie, HEADER, PATH, PARAM, JSON, or BODY),
+- the selector target (eg, 'color'), and
+- the match pattern
+
+Without this feature, the server is stateless.  With this feature in use,
+the server becomes stateful.  See also _Reset_ under #Server Commands below.
+
+<span style="color: orange">I think I need to accumulate the rule source instead of overwriting </span>
+
+
+## Response Headers
+
+Headers can be included in the response definition.
+
+<span style="color: orange">**TODO example**</span>
+
+For sequenced respones, headers need to be repeated separately for each
+block.
+
+<span style="color: orange">**TODO example**</span>
+
+
 ## Formatting and Whitespace
 
-Newlines or one of the makers described above are required before any of the selectors
-(HEADER, PATH, PARAM, JSON, or BODY)
+Spaces and blank lines may be added before any rules, and before
+the status code or delay spec preceding the rules or response
+text (ie, the "global" status code or delay).
 
-The vertical bars may be included in environments where it is hard to insert newlines
-into the value, or to define multiple rules on a single line.  The at symbol (@) and
-greater than symbol (>) can also be used like the vertical bar.  For example, the
-following lines are equivalent to the rules specification in #Selection Rules above:
+Spaces and blank lines may be added to the selection rules to make
+them more readable. For example:
 
-    200 | PATH: /delete/ text: error | PARAM:dog /fido|spot/ text: Hi {dog} | text: OK
-    200 > PATH: /delete/ text: error > PARAM:dog /fido|spot/ text: Hi {dog} > text: OK
-
-Spaces are ignored at the beginning of any line in the rules specification with one
-exception.  If the content of a rule spans multiple lines, spaces are only removed
-from the first line.  They are copied verbatim on subsequent lines.
-
-Blank lines following a text rule are considered part of the response content, whereas
-blank lines following a file rule are ignored.  Spaces may be added to the rules to
-make them more readable. For example:
-
-    http://127.0.0.1:5000/samples?_echo_response=200
+    http://127.0.0.1:5000/?_echo_response=200
         PATH:       /\b100\d{3}/   file:samples/get/100xxx.json
 
         PARAM:name         /bob/   file:samples/get/bob.json
@@ -128,11 +276,40 @@ make them more readable. For example:
 
                                    file:samples/get/response.json
 
-Newlines are allowed in the following places
-- before and after global status code
-- before and after global delay
-- before text and file rules
-- after file rules
+Blank lines are ignored before and after rules with file content.
+Spaces at the beginning of a line are ignored for rules with file content.
+
+
+## Text Content Formatting
+
+Like rules with file content, blank lines are ignored before rules with
+text content, but blank lines are considered part of the text to be
+returned and are not ignored.  A text rule ends
+
+- at the end of the rules specification (ie, the last line)
+- when another rule is defined (ie, a line beginning with a selector type, like PARAM:). For example:
+
+      PARAM:color /green/ text:The color is green.
+      PARAM:color /blue/  text:The color is blue.
+
+- when a default rule is defined (ie, a line beginning with file: or text:, possibly with preceding spaces).  For example:
+
+      PARAM:color /green/ text:The color is green.
+      text: Unrecognized color.
+
+In the example above, the "text:" label is required to indicate the
+beginning of a new rule.  Contrast that with the following:
+
+      PARAM:color /green/ file:/color.echo
+      Unrecognized color.
+
+In this case, the default content is preceded by a file rule, so the "text:"
+label is not required.  The explicit "text:" may be added regardless and is
+useful for indenting the content.  For example:
+
+      PARAM:color /green/ text:The color is green.
+      PARAM:color /blue/  text:The color is blue.
+                          text:Unrecognized color.
 
 
 ## Comments
@@ -162,36 +339,68 @@ a comment line in the response content.  A file may look like this, for example:
 When included directly in the \_echo_response parameter, '#' must be encoded as %23.
 For example:
 
-    http://127.0.0.1:5000/samples?_echo_response=200
+    http://127.0.0.1:5000/?_echo_response=200
         %23 comment before rules
         PARAM:name  /bob/  file:samples/get/bob.json
         %23 another comment
         PARAM:name  /sue/  file:samples/get/sue.json"
+
+
+## Newline Markers
+
+The HEADER, PATH, PARAM, JSON, and BODY selectors must begin on a new line.
+For environments where it is hard to insert newlines into the \_echo_response
+value, one of the following characters may be used instead: a vertical bar,
+"@", or ">".  Each of the following lines, for example, are equivalent to the
+rules specification in #Selection Rules above:
+
+    | PATH: /delete/ text: error | PARAM:dog /fido|spot/ text: Hi {dog} | text: OK
+    > PATH: /delete/ text: error > PARAM:dog /fido|spot/ text: Hi {dog} > text: OK
+
+The newline markers may also be seen as a way to define multiple rules on a single line.
+They may also be included to add visual appeal, if you're into that.  For example:
+
+    200
+    | PATH: /delete/ text: error
+    | PARAM:dog /fido|spot/ text: Hi {dog}
+    | text: OK
+
+
+## Server Commands
+
+Reset the server.  This causes the cache to be cleared.  It is only
+needed when using sequenced responses.
+
+    http://127.0.0.1:5000/_echo_reset
+
+List the rules.  For debugging only.
+
+    http://127.0.0.1:5000/_echo_list_rules
+
 
 ## Limitations
 
 - Inline \_echo_response content cannot contain '#' or '&'.  These characters must be encoded as %23 and %26 respectively.  (These characters are allowed in file content.)
 - Response content cannot contain lines beginning with '#' or whitespace followed by '#'.  This is true of inline \_echo_response content as well as content stored in a file.
 - The template system is based on str.format(**args), so there are limits on the use of '{' and '}' in the response content.
-- Newlines not allowed in the middle of a selection rule line (see TODO below)
+- Newlines not allowed in the middle of a selection rule line (see #TODO maybe below)
 
-## TODO documentation
-
-- update for status and delay, including nesting/override semantics
-- update to include case insensitive and negation flags on the pattern
-- update to describe list of response content and header to be returned in round-robin order, relative to path without param values + selector type + selector target + pattern
-- update to describe /_echo_reset to reset the echo server and clear the cache
-- update to describe /_echo_list_rules for debugging
-- improve the Formatting and Whitespace section
 
 ## TODO
 
 - add error checking *everywhere* (including cirular file references), and add unit tests for each condition
 
-## TODO maybe
+
+## TODO probably
 
 - add support for an http location in addition to file and text
 - add support for use as a library in addition to use as a service
+- convert Rule to a class, with a rule\_id() method, and maybe a separate SimpleRule to be returned by the generator
+
+
+## TODO maybe
+
+- restrict treatment of text as template to inline text and files with .echo extension
 - add option for a user id (eg: _echo_id=psamuels/healthalgo-tracking-api) to set up a shared echo server
 - optimize by cacheing file contents as unresolved templates (and maybe the resolved instances too??)
 - optimize by precompiling all the static regular expressions, like EchoServer.param_pat

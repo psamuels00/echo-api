@@ -49,6 +49,9 @@ class TestEchoServer(unittest.TestCase):
 
 
 class TestSimpleResponse(TestEchoServer):
+    def test_minimal(self):
+        self.case('http://127.0.0.1:5000/?_echo_response=', 200, '')
+
     def test_content_only(self):
         self.case('http://127.0.0.1:5000/labs/Illuminati?_echo_response={ "id": 4 }',
             200, '{ "id": 4 }')
