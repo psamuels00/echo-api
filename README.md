@@ -183,7 +183,7 @@ to apply.  For example:
     PARAM:lname  /smith/  file:stillnomatches.echo
                           text:no match
 
-...or more simply: <span style="color: orange">Make sure this is tested.</span>
+...or more simply:
 
     file:nomatches.echo
     file:stillnomatches.echo
@@ -384,6 +384,7 @@ List the rules.  For debugging only.
 - Response content cannot contain lines beginning with '#' or whitespace followed by '#'.  This is true of inline \_echo_response content as well as content stored in a file.
 - The template system is based on str.format(**args), so there are limits on the use of '{' and '}' in the response content.
 - Newlines not allowed in the middle of a selection rule line (see #TODO maybe below)
+- Sequence markers have to begin on a new line
 
 
 ## TODO

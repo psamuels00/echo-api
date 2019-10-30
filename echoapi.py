@@ -13,15 +13,15 @@ app = Flask(__name__)
 
 
 Rule = namedtuple('Rule', [
-    'rule_source',
-    'selector_type',
-    'selector_target',
-    'pattern',
-    'status_code',
-    'delay',
-    'location',
-    'headers',
-    'value'
+    'rule_source',       # '' if directly from _echo_response, or name of file otherwise
+    'selector_type',     # one of { PATH, HEADER, PARAM, JSON, BODY }
+    'selector_target',   # name of header, parameter, or json field
+    'pattern',           # eg: /test/ or /Test/i or !/test/
+    'status_code',       # eg: 200
+    'delay',             # eg: 200, represents number of milliseconds to delay
+    'location',          # one of { file, text }
+    'headers',           # [ {},... ]
+    'values',            # [ [...],... ]
 ])
 
 
@@ -67,8 +67,21 @@ class Rules:
 
         rule_id = ':'.join((self.request_path, rule.rule_source, selector_type, selector_target, pattern))
         match_count = self.rule_match_count.get(rule_id, 0)
-        offset = match_count % len(rule.value)
+        offset = match_count % len(rule.values)
         self.rule_match_count[rule_id] = match_count + 1
+
+        # this is essentially a hack to support a file for a part of sequenced content
+        location = rule.location
+        value = rule.values[offset]
+        v = value[0] if len(value) > 0 else 'XXX'
+        m = re.match('\s*file:\s*(.*)$', v)
+        if m:
+            location = 'file'
+            rule.values[offset] = [m.group(1)]  # TODO warn if we are tossing away content
+        m = re.match('\s*text:\s*(.*)$', v, re.DOTALL)
+        if m:
+            location = 'text'
+            rule.values[offset][0] = m.group(1)
 
         return Rule(
             rule.rule_source,      # file that rule comes from, or '' if directly from _echo_response param value
@@ -77,9 +90,9 @@ class Rules:
             pattern,               # any regular expression
             rule.status_code,      # integer HTTP response code
             rule.delay,            # integer representing milliseconds
-            rule.location,         # one of { text, file }
+            location,              # one of { text, file }
             rule.headers[offset],  # dictionary of header values for a single response content
-            rule.value[offset])    # arbitrary text, a single response content value
+            rule.values[offset])   # arbitrary text, a single response content value
 
     def rule_selector_generator(self, headers, params, json):
         for rule in self.rules:
@@ -118,11 +131,21 @@ class Rules:
 
 class ResponseParser:
     def __init__(self, rule_source, status_code, delay):
-        self.rule_source = rule_source  # file that rule comes from, or '' if directly from _echo_response param value
-        self.status_code = status_code  # default status code (global default, inherited, or preceding any rules)
-        self.delay = delay              # default status code (global default, inherited, or preceding any rules)
-        self.lines = None               # used by parse() for elements at beginning of line
-        self.rules = []                 # returned by parse()
+        """
+        :param rule_source:
+            file that rule comes from, or '' if directly from _echo_response param value.
+            used to identify a rule for match counting in support of sequenced content
+        :param status_code:
+            default status code (global default, inherited, or preceding any rules)
+        :param delay:
+            default status code (global default, inherited, or preceding any rules)
+        """
+        self.rule_source = rule_source  # will not change
+        self.status_code = status_code  # will be updated if rule-specific value is parsed
+        self.delay = delay              # will be updated if rule-specific value is parsed
+        self.lines = None               # used by parse() to support parsing elements at beginning of line
+        self.is_sequenced = False       # used by parse() to know if text is part of sequenced content
+        self.rules = []                 # returned by parse(), this is the primary product of parsing
 
     def parse(self, text):
         self.lines = self.parse_response_into_lines(text)
@@ -132,8 +155,8 @@ class ResponseParser:
             self.parse_line(line)
 
         is_from_file = False if self.rule_source == '' else True
-        rulesAdjuster = RulesAdjuster(is_from_file)
-        rulesAdjuster.adjust(self.rules)
+        rulesAdjuster = RulesAdjuster(is_from_file, self.rules)
+        rulesAdjuster.adjust()
 
         return self.status_code, self.delay, self.rules
 
@@ -150,12 +173,17 @@ class ResponseParser:
         return multiline.splitlines(keepends=True)
 
     def parse_line(self, line):
+        # comments are completely ignored, period
         if self.is_comment(line):
             pass
+
+        # a match here implies there is no sequenced content yet
         elif not self.rules and self.begins_with_status_code(line):
             pass
         elif not self.rules and self.begins_with_delay(line):
             pass
+
+        # a match here ends parsing of sequenced content and begins a new rule
         elif self.is_matching_header_rule(line):
             pass
         elif self.is_matching_path_rule(line):
@@ -166,28 +194,41 @@ class ResponseParser:
             pass
         elif self.is_matching_body_rule(line):
             pass
+
+        # a match here begins sequenced content and creates a rule if there are none yet
+        elif self.begins_with_sequence_marker(line):
+            pass
+
+        # a match here creates a new rule or (if part of sequenced content) starts a new element in the current sequence
         elif self.is_matching_rule_with_explicit_location(line):
             pass
+
+        # a match here adds to an existing text rule, whether part of sequenced content or not
         elif self.rules and self.rules[-1].location == 'text':
             # add to the content of the most recent rule, which is a text rule
             rule = self.rules[-1]
-            # any extra text is appended to value here, but further parsed by RulesAdjuster later
-            rule.value.append(line)
+            # add to the currently being parsed element of sequenced content
+            value = rule.values[-1]
+            # any extra text is appended to value here, and further parsed by RulesAdjuster later
+            value.append(line)
+
+        # blank lines are ignored before any rules or after a file rule
         elif self.is_blank(line):
-            # ignore blank lines before any rules or after a file rule
             pass
+
+        # a match here creates a new rule or (if part of sequenced content) starts a new element in the current sequence
         else:
             self.add_rule_with_implied_text_location(line)
 
     def add_rule(self, selector_type, selector_target, pattern, status_code, delay, location, value):
         rule_source = self.rule_source
+        selector_target = '' if selector_target is None else selector_target
         status_code = self.status_code if status_code is None else int(status_code)
         delay = self.delay if delay is None else int(delay)
         location = location or 'text'
-        headers = []  # RulesAdjuster moves entries from value to headers
-
-        if selector_target is None:
-            selector_target = ''
+        headers = []  # RulesAdjuster moves entries from values to headers
+        content = [value] # content is stored as a list of values, here initialized with the first value
+        values = [content] # to support sequenced content, we wrap the first content value in a list
 
         rule = Rule(
             rule_source,      # file that rule comes from, or '' if directly from _echo_response param value
@@ -198,26 +239,40 @@ class ResponseParser:
             delay,            # integer representing milliseconds
             location,         # one of { text, file }
             headers,          # dictionary of header values for multiple response content
-            [value])          # arbitrary text, may include multiple response content values, will be parsed by RulesAdjuster
+            values)           # arbitrary text, may include multiple response content values
+                              # if location is file, then the text will be the file path
         self.rules.append(rule)
 
-    def add_rule_if_match(self, line, pattern, groups):
+    def add_if_match(self, line, pattern, groups, reset_sequence=True):
         m = re.match(pattern, line, re.DOTALL)
         if m:
+            if reset_sequence:
+                self.is_sequenced = False
+
             args = [ m.group(n) if n else None
                      for n in groups ]
-            self.add_rule(*args)
+
+            if not self.is_sequenced:
+                self.add_rule(*args)
+            elif self.rules:
+                selector_type, selector_target, pattern, status_code, delay, location, value = args
+                self.rules[-1].values[-1].append(f'{location}:{value}')
+
             return True
         return False
 
     def is_comment(self, line):
         return re.match(r'\s*#', line)
 
+    def is_blank(self, line):
+        return re.match(r'\s*$', line)
+
     def begins_with_status_code(self, line):
         m = re.match(r'\s*(\d{3})\b\s*(.*)', line, re.DOTALL)
         if m:
             self.status_code = int(m.group(1))
-            self.lines.insert(0, m.group(2))
+            if len(m.group(2)) > 0:
+                self.lines.insert(0, m.group(2))
             return True
         return False
 
@@ -225,107 +280,108 @@ class ResponseParser:
         m = re.match(r'\s*delay\s*=(\d+)ms\b\s*(.*)', line, re.DOTALL)
         if m:
             self.delay = int(m.group(1))
-            self.lines.insert(0, m.group(2))
+            if len(m.group(2)) > 0:
+                self.lines.insert(0, m.group(2))
             return True
         return False
 
+    def begins_with_sequence_marker(self, line):
+        m = re.match(r'\s*--\[\s*(\d*)\s*\]--\s*(.*)', line, re.DOTALL)
+        if not m:
+            return False
+
+        if self.is_sequenced:
+            self.rules[-1].values.append([])
+        else:
+            if not self.rules:
+                self.add_rule(None, None, None, None, None, 'text', '')
+            self.rules[-1].values.clear()  # TODO warn if we are tossing away content
+            self.rules[-1].values.append([])
+            self.is_sequenced = True
+
+        if len(m.group(2)) > 0:
+            self.lines.insert(0, m.group(2))
+
+        return True
+
     def is_matching_header_rule(self, line):
-        return self.add_rule_if_match(line,
+        return self.add_if_match(line,
             r'\s*(HEADER):\s*(.+?)\s*(!?/.*?/i?)\s*((\d{3})\b\s*)?(delay=(\d+)ms\s*)?((text|file):)?\s*(.*)',
             (    1,          2,      3,             5,                   7,           9,               10  ))
 
     def is_matching_path_rule(self, line):
-        return self.add_rule_if_match(line,
+        return self.add_if_match(line,
             r'\s*(PATH):\s*(!?/.*?/i?)\s*((\d{3})\b\s*)?(delay=(\d+)ms\s*)?((text|file):)?\s*(.*)',
             (    1,     0, 2,             4,                   6,           8,               9   ))
 
     def is_matching_param_rule(self, line):
-        return self.add_rule_if_match(line,
+        return self.add_if_match(line,
             r'\s*(PARAM):\s*(.+?)\s*(!?/.*?/i?)\s*((\d{3})\b\s*)?(delay=(\d+)ms\s*)?((text|file):)?\s*(.*)',
             (    1,         2,      3,             5,                   7,           9,               10  ))
 
     def is_matching_json_rule(self, line):
-        return self.add_rule_if_match(line,
+        return self.add_if_match(line,
             r'\s*(JSON):\s*(.+?)\s*(!?/.*?/i?)\s*((\d{3})\b\s*)?(delay=(\d+)ms\s*)?((text|file):)?\s*(.*)',
             (    1,        2,      3,             5,                   7,           9,               10  ))
 
     def is_matching_body_rule(self, line):
-        return self.add_rule_if_match(line,
+        return self.add_if_match(line,
             r'\s*(BODY):\s*(!?/.*?/i?)\s*((\d{3})\b\s*)?(delay=(\d+)ms\s*)?((text|file):)?\s*(.*)',
             (    1,     0, 2,             4,                   6,           8,               9   ))
 
     def is_matching_rule_with_explicit_location(self, line):
-        return self.add_rule_if_match(line,
+        return self.add_if_match(line,
             r'\s*((\d{3})\b\s*)?(delay=(\d+)ms\s*)?(text|file):\s*(.*)',
-            (0,0,0,2,                  4,          5,             6  ))
+            (0,0,0,2,                  4,          5,             6  ),
+            reset_sequence=False)
 
     def add_rule_with_implied_text_location(self, line):
-        return self.add_rule_if_match(line,
+        return self.add_if_match(line,
             r'(\s*(\d{3})\b)?(\s*delay=(\d+)ms)?(.*)',
-            (0,0,0,2,                  4,    0, 5   ))
-
-    def is_blank(self, line):
-        return re.match(r'\s*$', line)
+            (0,0,0,2,                  4,    0, 5   ),
+            reset_sequence=False)
 
 
 class RulesAdjuster:
 
-    blank_line_pat = re.compile(r'\s*$')
-    content_selector_pat = re.compile(r'\s*--\[\s*(\d*)\s*\]--\s*$')
+    # eg: HEADER: Accept: compressed
     header_line_pat = re.compile(r'\s*HEADER:\s*(.+)\s*:\s*(.*)')
 
-    def __init__(self, is_from_file):
+    def __init__(self, is_from_file, rules):
         self.is_from_file = is_from_file
+        self.rules = rules
 
-    def adjust(self, rules):
-        for rule in rules:
+    def adjust(self):
+        for rule in self.rules:
             self.adjust_rule(rule)
 
     def adjust_rule(self, rule):
-        lines = rule.value.copy()
+        values = rule.values.copy()
+        rule.values.clear()
+        rule.headers.clear() # it should already be empty
+
+        for lines in values:
+            self.adjust_rule_content(lines, rule)
+
+    def adjust_rule_content(self, lines, rule):
         headers = {}
-        content = []
-        rule.headers.clear()
-        rule.headers.append(headers)  # [headers1, headers2,...]
-        rule.value.clear()
-        rule.value.append(content)    # [content1, content2,...]
 
-        blanks_only = True
-        for line in lines:
-            if self.is_content_selector(line):
-                content = []
-                headers = {}
+        # move headers from value to headers field
+        while lines and self.rule_content_begins_with_header(lines, headers):
+            pass
 
-                if blanks_only:
-                    # if we've only seen blank lines so far, replace them
-                    rule.value[-1] = content
-                    rule.headers[-1] = headers
-                else:
-                    rule.value.append(content)
-                    rule.headers.append(headers)
+        # remove whitespace before first line of content, unless it is from a file
+        if lines and not self.is_from_file:
+            lines[0] = lines[0].lstrip()
 
-                blanks_only = True
-            elif self.is_header_line(line, headers):
-                blanks_only = False
-            elif blanks_only and self.is_blank_line(line):
-                pass
-            else:
-                # remove whitespace before first line of content, unless it is from a file
-                if len(content) == 0 and not self.is_from_file:
-                    line = line.lstrip()
-                content.append(line)
-                blanks_only = False
+        rule.values.append(lines)
+        rule.headers.append(headers)
 
-    def is_blank_line(self, line):
-        return re.match(self.blank_line_pat, line)
-
-    def is_content_selector(self, line):
-        return re.match(self.content_selector_pat, line)
-
-    def is_header_line(self, line, headers):
-        m = re.match(self.header_line_pat, line)
+    def rule_content_begins_with_header(self, lines, headers):
+        m = re.match(self.header_line_pat, lines[0])
         if m:
             headers[m.group(1)] = m.group(2)
+            lines.pop(0)
             return True
         return False
 
@@ -398,7 +454,7 @@ class RulesTemplate:
             delay = rule.delay
             headers = rule.headers
             status = rule.status_code
-            content = ''.join(rule.value)
+            content = ''.join(rule.values)
 
             if rule.location == 'file':
                 file = content.strip()

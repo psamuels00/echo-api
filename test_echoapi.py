@@ -4,17 +4,27 @@ from box import Box
 from echoapi import RulesTemplate
 
 import requests
+import sys
 import timeit
 import unittest
 
 
 def setUpModule():
     # reset the echo server, needed by TestMultipleResponses
-    requests.get('http://127.0.0.1:5000/_echo_reset')
+    try:
+        requests.get('http://127.0.0.1:5000/_echo_reset')
+    except requests.exceptions.ConnectionError:
+        print('Error connecting to Echo Server')
+        print('Are you sure it is running?')
+        sys.exit(1)
+
+setUpModule()
 
 
 class TestEchoServer(unittest.TestCase):
     def setUp(self):
+        # These values are included with every request.  In most cases, they are ignored, but certain tests rely on
+        # certain headers, json, or params to be set, and it is easier to simply include them all with each test.
         self.headers = {
             'authorization': 'Bearer Tutti-Frutti',
             'team': 'Pirates',
@@ -326,6 +336,13 @@ class TestNestedFiles(TestEchoServer):
     def test_no_rule_selected(self):
         self.case('http://127.0.0.1:5000/samples?_echo_response=200 file:test/no_match.echo',
             200, '')
+
+    def test_no_rule_selected_twice(self):
+        self.case('''http://127.0.0.1:5000/samples?_echo_response=200
+                     file:test/no_match.echo
+                     file:test/still_no_match.echo
+                     text:no matches''',
+            200, 'no matches')
 
 
 class TestBlankLines(TestEchoServer):
@@ -651,7 +668,7 @@ class TestMultipleResponses(TestEchoServer):
                      --[ 2 ]--
                      beta
                  PARAM:kolor /beige/
-                      --[ 1 ]--
+                     --[ 1 ]--
                      gamma
                      --[ 2 ]--
                      delta'''
@@ -689,3 +706,113 @@ class TestMultipleResponses(TestEchoServer):
         self.case(url, 200, 'alpha\n')
         self.case(url, 200, 'beta\n')
         self.case(url, 200, 'delta\n', alt_color='purple')
+
+    def test_cycle_through_files(self):
+        url = '''http://127.0.0.1:5000/test/seq/1/?_echo_response=200
+                 --[ 0 ]--
+                 file:test/seq/1.json
+                 --[ 0 ]--
+                 file:test/seq/2.json'''
+        self.case(url, 200, '{ "value": 1 }\n')
+        self.case(url, 200, '{ "value": 2 }\n')
+
+    def test_cycle_through_files_compact_syntax(self):
+        url = '''http://127.0.0.1:5000/test/seq/2/?_echo_response=200
+                 --[ 0 ]-- file:test/seq/1.json
+                 --[ 0 ]-- file:test/seq/2.json'''
+        self.case(url, 200, '{ "value": 1 }\n')
+        self.case(url, 200, '{ "value": 2 }\n')
+
+    def test_explicit_text_label(self):
+        url = '''http://127.0.0.1:5000/test/case/6/?_echo_response=200
+                 --[ 0 ]--
+                 peanuts
+                 --[ 0 ]--
+                 text:peanuts
+                 --[ 0 ]--
+                 text:cashews'''
+        self.case(url, 200, 'peanuts\n')
+        self.case(url, 200, 'peanuts\n')
+        self.case(url, 200, 'cashews')
+
+    def test_file_and_text_implicit_and_explicit(self):
+        url = '''http://127.0.0.1:5000/test/case/7/?_echo_response=200
+                 --[ 0 ]--
+                 file:test/seq/1.json
+                 --[ 0 ]--
+                 text:non-label-free
+                 --[ 0 ]--
+                 label-free'''
+        self.case(url, 200, '{ "value": 1 }\n')
+        self.case(url, 200, 'non-label-free\n')
+        self.case(url, 200, 'label-free')
+
+    def test_multiple_response_selected_content_from_file_by_path_param(self):
+        url = '''http://127.0.0.1:5000/test/case/4/kolor:{}?_echo_response=200
+                 PARAM:kolor /green/
+                     --[ 1 ]--
+                     file:test/seq/1.json
+                     --[ 2 ]--
+                     file:test/seq/2.json
+                 PARAM:kolor /beige/
+                     --[ 1 ]--
+                     file:test/seq/1.json
+                     --[ 2 ]--
+                     text:aardvark'''
+        green_url = url.format('green')
+        beige_url = url.format('beige')
+        self.case(green_url, 200, '{ "value": 1 }\n')
+        self.case(green_url, 200, '{ "value": 2 }\n')
+        self.case(beige_url, 200, '{ "value": 1 }\n')
+        self.case(beige_url, 200, 'aardvark')
+
+    def test_header_in_response(self):
+        expected_headers = [
+            { 'content-type': 'plain/text' },
+            { 'content-type': 'json' },
+            {},
+        ]
+        url = '''http://127.0.0.1:5000/hdr/2?_echo_response=200
+                 --[ 1 ]--
+                 HEADER: content-type: plain/text
+                 text: { "id": 5 }
+                 --[ 1 ]--
+                 HEADER: content-type: json
+                 text: { "id": 6 }
+                 --[ 1 ]--
+                 no header'''
+        self.case(url, 200, '{ "id": 5 }\n', expected_headers[0])
+        self.case(url, 200, '{ "id": 6 }\n', expected_headers[1])
+        self.case(url, 200, 'no header', expected_headers[2])
+
+    def test_content_before_first_marker(self):
+        url = '''http://127.0.0.1:5000/test/case/8/?_echo_response=200
+                 suspicious text. this will be ignored.
+                 --[ 0 ]--
+                 text:peanuts
+                 --[ 0 ]--
+                 text:cashews'''
+        self.case(url, 200, 'peanuts\n')
+        self.case(url, 200, 'cashews')
+
+    def test_ignore_lines_after_file_rule(self):
+        url = '''http://127.0.0.1:5000/test/case/9/?_echo_response=200
+                 --[ 0 ]--
+                 file:test/seq/1.json
+                 this line ignored
+                 --[ 0 ]--
+                 file:test/seq/2.json
+                 this line ignored also
+                 '''
+        self.case(url, 200, '{ "value": 1 }\n')
+        self.case(url, 200, '{ "value": 2 }\n')
+
+    def test_explicit_text_label_multiple_lines(self):
+        url = '''http://127.0.0.1:5000/test/case/10/?_echo_response=200
+                 --[ 0 ]--
+                 text:peanuts
+                 and popcorn
+                 --[ 0 ]--
+                 text:cashews'''
+        self.case(url, 200, 'peanuts\n                 and popcorn\n')
+        self.case(url, 200, 'cashews')
