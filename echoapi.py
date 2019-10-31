@@ -30,6 +30,19 @@ class Rule(typing.NamedTuple):
         pattern = '' if self.pattern is None else self.pattern
         return ':'.join((request_path, self.rule_source, selector_type, selector_target, pattern))
 
+    def at_offset(self, offset, location):
+        return Rule(
+            self.rule_source,
+            self.selector_type,
+            self.selector_target,
+            self.pattern,
+            self.status_code,
+            self.delay,
+            location,
+            self.headers[offset],
+            self.values[offset]
+        )
+
 
 class Rules:
 
@@ -85,16 +98,7 @@ class Rules:
             location = 'text'
             rule.values[offset][0] = m.group(1)
 
-        return Rule(
-            rule.rule_source,      # file that rule comes from, or '' if directly from _echo_response param value
-            rule.selector_type,    # one of { PATH, PARAM, JSON, BODY, None }
-            rule.selector_target,  # eg: id, or sample.location.name
-            rule.pattern,          # any regular expression
-            rule.status_code,      # integer HTTP response code
-            rule.delay,            # integer representing milliseconds
-            location,              # one of { text, file }
-            rule.headers[offset],  # dictionary of header values for a single response content
-            rule.values[offset])   # arbitrary text, a single response content value
+        return rule.at_offset(offset, location)
 
     def rule_selector_generator(self, headers, params, json):
         for rule in self.rules:
