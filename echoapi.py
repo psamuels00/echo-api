@@ -1,28 +1,34 @@
 #!/usr/bin/env python
 
 from box import Box
-from collections import namedtuple
 from flask import Flask, request, Response
 
 import os
 import re
 import time
+import typing
 
 
 app = Flask(__name__)
 
 
-Rule = namedtuple('Rule', [
-    'rule_source',       # '' if directly from _echo_response, or name of file otherwise
-    'selector_type',     # one of { PATH, HEADER, PARAM, JSON, BODY }
-    'selector_target',   # name of header, parameter, or json field
-    'pattern',           # eg: /test/ or /Test/i or !/test/
-    'status_code',       # eg: 200
-    'delay',             # eg: 200, represents number of milliseconds to delay
-    'location',          # one of { file, text }
-    'headers',           # [ {},... ]
-    'values',            # [ [...],... ]
-])
+class Rule(typing.NamedTuple):
+
+    rule_source: str       # '' if directly from _echo_response, or name of file otherwise
+    selector_type: str     # one of { PATH, HEADER, PARAM, JSON, BODY }
+    selector_target: str   # name of header, parameter, or json field
+    pattern: str           # eg: /test/ or /Test/i or !/test/
+    status_code: int       # eg: 200
+    delay: int             # eg: 200, represents number of milliseconds to delay
+    location: str          # one of { file, text }
+    headers: list          # [ {},... ]
+    values: list           # [ [...],... ]
+
+    def eye_dee(self, request_path):
+        selector_type = '' if self.selector_type is None else self.selector_type
+        selector_target = '' if self.selector_target is None else self.selector_target
+        pattern = '' if self.pattern is None else self.pattern
+        return ':'.join((request_path, self.rule_source, selector_type, selector_target, pattern))
 
 
 class Rules:
@@ -61,11 +67,7 @@ class Rules:
         return got_match
 
     def select_content_from_list(self, rule):
-        selector_type = '' if rule.selector_type is None else rule.selector_type
-        selector_target = '' if rule.selector_target is None else rule.selector_target
-        pattern = '' if rule.pattern is None else rule.pattern
-
-        rule_id = ':'.join((self.request_path, rule.rule_source, selector_type, selector_target, pattern))
+        rule_id = rule.eye_dee(self.request_path)
         match_count = self.rule_match_count.get(rule_id, 0)
         offset = match_count % len(rule.values)
         self.rule_match_count[rule_id] = match_count + 1
@@ -85,9 +87,9 @@ class Rules:
 
         return Rule(
             rule.rule_source,      # file that rule comes from, or '' if directly from _echo_response param value
-            selector_type,         # one of { PATH, PARAM, JSON, BODY, None }
-            selector_target,       # eg: id, or sample.location.name
-            pattern,               # any regular expression
+            rule.selector_type,    # one of { PATH, PARAM, JSON, BODY, None }
+            rule.selector_target,  # eg: id, or sample.location.name
+            rule.pattern,          # any regular expression
             rule.status_code,      # integer HTTP response code
             rule.delay,            # integer representing milliseconds
             location,              # one of { text, file }

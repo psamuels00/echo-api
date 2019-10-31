@@ -396,13 +396,12 @@ List the rules.  For debugging only.
 
 - add support for an http location in addition to file and text
 - add support for use as a library in addition to use as a service
-- convert Rule to a class, with a rule\_id() method, and maybe a separate SimpleRule to be returned by the generator
 
 
 ## TODO maybe
 
 - restrict treatment of text as template to inline text and files with .echo extension
-- add option for a user id (eg: _echo_id=psamuels/healthalgo-tracking-api) to set up a shared echo server
+- add option for a user id (eg: _echo_user=psamuels/healthalgo-tracking-api) to set up a shared echo server
 - optimize by cacheing file contents as unresolved templates (and maybe the resolved instances too??)
 - optimize by precompiling all the static regular expressions, like EchoServer.param_pat
 - allow newlines anywhere in a rule (after selector type, selector target, pattern, status code, delay, or location)
