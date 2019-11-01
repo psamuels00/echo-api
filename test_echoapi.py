@@ -753,6 +753,25 @@ class TestMultipleResponses(TestEchoServer):
         self.case(url, 200, 'non-label-free\n')
         self.case(url, 200, 'label-free')
 
+    def test_no_matching_content(self):
+        url = '''http://127.0.0.1:5000/test/case/9/?_echo_response=200
+                 --[ 0 ]--
+                 file:test/no_match.echo
+                 --[ 0 ]--
+                 '''
+        self.case(url, 200, '')
+        self.case(url, 200, '')
+
+    def test_explicit_text_label_multiple_lines(self):
+        url = '''http://127.0.0.1:5000/test/case/10/?_echo_response=200
+                 --[ 0 ]--
+                 text:peanuts
+                 and popcorn
+                 --[ 0 ]--
+                 text:cashews'''
+        self.case(url, 200, 'peanuts\n                 and popcorn\n')
+        self.case(url, 200, 'cashews')
+
     def test_multiple_response_selected_content_from_file_by_path_param(self):
         url = '''http://127.0.0.1:5000/test/case/4/kolor:{}?_echo_response=200
                  PARAM:kolor /green/
@@ -813,21 +832,15 @@ class TestMultipleResponses(TestEchoServer):
         self.case(url, 200, '{ "value": 1 }\n')
         self.case(url, 200, '{ "value": 2 }\n')
 
-    def test_no_matching_content(self):
+    def test_multiple_locations_in_content(self):
         url = '''http://127.0.0.1:5000/test/case/9/?_echo_response=200
                  --[ 0 ]--
                  file:test/no_match.echo
+                 file:test/still_no_match.echo
+                 text:no matches
                  --[ 0 ]--
-                 '''
-        self.case(url, 200, '')
-        self.case(url, 200, '')
+                 file:test/no_match.echo
+                 no match again'''
+        self.case(url, 200, 'no matches\n')
+        self.case(url, 200, '                 no match again')
 
-    def test_explicit_text_label_multiple_lines(self):
-        url = '''http://127.0.0.1:5000/test/case/10/?_echo_response=200
-                 --[ 0 ]--
-                 text:peanuts
-                 and popcorn
-                 --[ 0 ]--
-                 text:cashews'''
-        self.case(url, 200, 'peanuts\n                 and popcorn\n')
-        self.case(url, 200, 'cashews')

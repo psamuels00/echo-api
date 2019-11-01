@@ -30,13 +30,7 @@ class Rule(typing.NamedTuple):
         pattern = '' if self.pattern is None else self.pattern
         return ':'.join((request_path, self.rule_source, selector_type, selector_target, pattern))
 
-    def at_offset(self, offset):
-        location = self.location[offset]
-        value = self.values[offset]
-        if location and location[0] == 'file':
-            location = [ location[0] ]
-            value = [ value[0].strip() ]
-
+    def rule4location(self, offset, location, values):
         return Rule(
             self.rule_source,
             self.selector_type,
@@ -46,8 +40,23 @@ class Rule(typing.NamedTuple):
             self.delay,
             location,
             self.headers[offset],
-            value
+            values
         )
+
+    def at_offset(self, offset):
+        locations = self.location[offset]
+        values = self.values[offset]
+
+        rules = []
+        while locations and locations[0] == 'file':
+            rule = self.rule4location(offset, locations.pop(0), values.pop(0))
+            rules.append(rule)
+
+        if values:
+            rule = self.rule4location(offset, [['text']], values)
+            rules.append(rule)
+
+        return rules
 
 
 class Rules:
@@ -124,8 +133,12 @@ class Rules:
                     apply_rule = True
 
             if apply_rule:
-                rule = self.select_content_from_list(rule)
-                yield rule
+                # we get a list of rules here since there could be multiple locations in sequenced content
+                rules = self.select_content_from_list(rule)
+                # once a match is made on one rule, we can stop checking for more rules so all
+                # the rules will not necessarily be yielded or "pulled through" via next()
+                for rule in rules:
+                    yield rule
 
 
 class ResponseParser:
@@ -461,7 +474,7 @@ class RulesTemplate:
             status = rule.status_code
             content = ''.join(rule.values)
 
-            if rule.location and rule.location[0] == 'file':
+            if rule.location == 'file':
                 file = content.strip()
                 delay, headers, status, content = self.resolve_file(
                     file, status, delay, headers, params, json, level + 1)
