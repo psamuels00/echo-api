@@ -24,7 +24,7 @@ class Rule(typing.NamedTuple):
     headers: list          # [ {},... ]
     values: list           # [ [...],... ]
 
-    def eye_dee(self, request_path):
+    def unique_id(self, request_path):
         selector_type = '' if self.selector_type is None else self.selector_type
         selector_target = '' if self.selector_target is None else self.selector_target
         pattern = '' if self.pattern is None else self.pattern
@@ -33,7 +33,7 @@ class Rule(typing.NamedTuple):
     def at_offset(self, offset):
         location = self.location[offset]
         value = self.values[offset]
-        if location[0] == 'file':
+        if location and location[0] == 'file':
             location = [ location[0] ]
             value = [ value[0].strip() ]
 
@@ -86,20 +86,11 @@ class Rules:
         return got_match
 
     def select_content_from_list(self, rule):
-        rule_id = rule.eye_dee(self.request_path)
+        rule_id = rule.unique_id(self.request_path)
         match_count = self.rule_match_count.get(rule_id, 0)
         self.rule_match_count[rule_id] = match_count + 1
 
         offset = match_count % len(rule.values)
-
-        # this is essentially a hack to support a file for a part of sequenced content
-        value = rule.values[offset]
-        v = value[0] if len(value) > 0 else 'XXX'
-        m = re.match('\s*file:\s*(.*)$', v)
-        if m and rule.location[offset][0] == 'text':
-            rule.location[offset] = ['file']
-            rule.values[offset] = [m.group(1)]  # TODO warn if we are tossing away content
-
         return rule.at_offset(offset)
 
     def rule_selector_generator(self, headers, params, json):
@@ -470,7 +461,7 @@ class RulesTemplate:
             status = rule.status_code
             content = ''.join(rule.values)
 
-            if rule.location[0] == 'file':
+            if rule.location and rule.location[0] == 'file':
                 file = content.strip()
                 delay, headers, status, content = self.resolve_file(
                     file, status, delay, headers, params, json, level + 1)

@@ -813,6 +813,15 @@ class TestMultipleResponses(TestEchoServer):
         self.case(url, 200, '{ "value": 1 }\n')
         self.case(url, 200, '{ "value": 2 }\n')
 
+    def test_no_matching_content(self):
+        url = '''http://127.0.0.1:5000/test/case/9/?_echo_response=200
+                 --[ 0 ]--
+                 file:test/no_match.echo
+                 --[ 0 ]--
+                 '''
+        self.case(url, 200, '')
+        self.case(url, 200, '')
+
     def test_explicit_text_label_multiple_lines(self):
         url = '''http://127.0.0.1:5000/test/case/10/?_echo_response=200
                  --[ 0 ]--
