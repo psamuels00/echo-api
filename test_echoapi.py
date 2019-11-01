@@ -131,6 +131,12 @@ class TestResponseFile(TestEchoServer):
         self.case('http://127.0.0.1:5000/samples?_echo_response=200 file:test/trail_nl.txt',
             200, RulesTemplate().load_file('test/trail_nl.txt'))
 
+    def test_file_then_implicit_text(self):
+        self.case('''http://127.0.0.1:5000/samples?_echo_response=200
+                     file:test/no_match.echo
+                     ok''',
+                  200, 'ok')
+
 
 class TestParameters(TestEchoServer):
     def test_named_path_parameters(self):

@@ -20,7 +20,7 @@ class Rule(typing.NamedTuple):
     pattern: str           # eg: /test/ or /Test/i or !/test/
     status_code: int       # eg: 200
     delay: int             # eg: 200, represents number of milliseconds to delay
-    location: str          # one of { file, text }
+    location: list         # list of values, each one of { file, text }
     headers: list          # [ {},... ]
     values: list           # [ [...],... ]
 
@@ -30,7 +30,13 @@ class Rule(typing.NamedTuple):
         pattern = '' if self.pattern is None else self.pattern
         return ':'.join((request_path, self.rule_source, selector_type, selector_target, pattern))
 
-    def at_offset(self, offset, location):
+    def at_offset(self, offset):
+        location = self.location[offset]
+        value = self.values[offset]
+        if location[0] == 'file':
+            location = [ location[0] ]
+            value = [ value[0].strip() ]
+
         return Rule(
             self.rule_source,
             self.selector_type,
@@ -40,7 +46,7 @@ class Rule(typing.NamedTuple):
             self.delay,
             location,
             self.headers[offset],
-            self.values[offset]
+            value
         )
 
 
@@ -82,23 +88,19 @@ class Rules:
     def select_content_from_list(self, rule):
         rule_id = rule.eye_dee(self.request_path)
         match_count = self.rule_match_count.get(rule_id, 0)
-        offset = match_count % len(rule.values)
         self.rule_match_count[rule_id] = match_count + 1
 
+        offset = match_count % len(rule.values)
+
         # this is essentially a hack to support a file for a part of sequenced content
-        location = rule.location
         value = rule.values[offset]
         v = value[0] if len(value) > 0 else 'XXX'
         m = re.match('\s*file:\s*(.*)$', v)
-        if m:
-            location = 'file'
+        if m and rule.location[offset][0] == 'text':
+            rule.location[offset] = ['file']
             rule.values[offset] = [m.group(1)]  # TODO warn if we are tossing away content
-        m = re.match('\s*text:\s*(.*)$', v, re.DOTALL)
-        if m:
-            location = 'text'
-            rule.values[offset][0] = m.group(1)
 
-        return rule.at_offset(offset, location)
+        return rule.at_offset(offset)
 
     def rule_selector_generator(self, headers, params, json):
         for rule in self.rules:
@@ -210,13 +212,14 @@ class ResponseParser:
             pass
 
         # a match here adds to an existing text rule, whether part of sequenced content or not
-        elif self.rules and self.rules[-1].location == 'text':
+        elif self.rules \
+                and len(self.rules[-1].location) \
+                and len(self.rules[-1].location[-1]) \
+                and self.rules[-1].location[-1][-1] == 'text':
             # add to the content of the most recent rule, which is a text rule
-            rule = self.rules[-1]
             # add to the currently being parsed element of sequenced content
-            value = rule.values[-1]
             # any extra text is appended to value here, and further parsed by RulesAdjuster later
-            value.append(line)
+            self.rules[-1].values[-1].append(line)
 
         # blank lines are ignored before any rules or after a file rule
         elif self.is_blank(line):
@@ -231,8 +234,8 @@ class ResponseParser:
         selector_target = '' if selector_target is None else selector_target
         status_code = self.status_code if status_code is None else int(status_code)
         delay = self.delay if delay is None else int(delay)
-        location = location or 'text'
-        headers = []  # RulesAdjuster moves entries from values to headers
+        location = [ [location or 'text'] ] # a list to support sequenced content
+        headers = [] # RulesAdjuster moves entries from values to headers, a list to support sequenced content
         content = [value] # content is stored as a list of values, here initialized with the first value
         values = [content] # to support sequenced content, we wrap the first content value in a list
 
@@ -243,7 +246,7 @@ class ResponseParser:
             pattern,          # any regular expression
             status_code,      # integer HTTP response code
             delay,            # integer representing milliseconds
-            location,         # one of { text, file }
+            location,         # a list of values, each one of { text, file }
             headers,          # dictionary of header values for multiple response content
             values)           # arbitrary text, may include multiple response content values
                               # if location is file, then the text will be the file path
@@ -261,8 +264,10 @@ class ResponseParser:
             if not self.is_sequenced:
                 self.add_rule(*args)
             elif self.rules:
-                selector_type, selector_target, pattern, status_code, delay, location, value = args
-                self.rules[-1].values[-1].append(f'{location}:{value}')
+                _, _, _, _, _, location, value = args
+                rule = self.rules[-1]
+                rule.location[-1].append(location or 'text')
+                rule.values[-1].append(value)
 
             return True
         return False
@@ -297,10 +302,13 @@ class ResponseParser:
             return False
 
         if self.is_sequenced:
+            self.rules[-1].location.append([])
             self.rules[-1].values.append([])
         else:
             if not self.rules:
                 self.add_rule(None, None, None, None, None, 'text', '')
+            self.rules[-1].location.clear()
+            self.rules[-1].location.append([])
             self.rules[-1].values.clear()  # TODO warn if we are tossing away content
             self.rules[-1].values.append([])
             self.is_sequenced = True
@@ -462,7 +470,7 @@ class RulesTemplate:
             status = rule.status_code
             content = ''.join(rule.values)
 
-            if rule.location == 'file':
+            if rule.location[0] == 'file':
                 file = content.strip()
                 delay, headers, status, content = self.resolve_file(
                     file, status, delay, headers, params, json, level + 1)
