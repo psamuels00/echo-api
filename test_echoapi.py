@@ -14,8 +14,8 @@ def setUpModule():
     try:
         requests.get('http://127.0.0.1:5000/_echo_reset')
     except requests.exceptions.ConnectionError:
-        print('Error connecting to Echo Server')
-        print('Are you sure it is running?')
+        print('Error connecting to Echo Server.', file=sys.stderr)
+        print('Are you sure it is running?', file=sys.stderr)
         sys.exit(1)
 
 setUpModule()
