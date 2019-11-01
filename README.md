@@ -169,11 +169,7 @@ For example:
     PARAM:color  !/GREEN/i  text:Not gReEn, in any case
 
 
-## Nested Templates
-
-The contents of a text file may contain a single text template,
-or it may contain a complete rules specification, the same format
-as the \_echo_response parameter.
+## Multiple Locations
 
 If a file is processed and no matches are made (and therefore, no
 content to be returned), we continue looking for more rules
@@ -183,11 +179,20 @@ to apply.  For example:
     PARAM:lname  /smith/  file:stillnomatches.echo
                           text:no match
 
-...or more simply:
+This works even if there are no selection criteria:
 
     file:nomatches.echo
     file:stillnomatches.echo
     text:no match
+
+
+## Nested Templates
+
+<span style="color: orange">**TODO improve this section**</span>
+
+The contents of a text file may contain a single text template,
+or it may contain a complete rules specification, the same format
+as the \_echo_response parameter.
 
 There is no limit to the number of file references that may be
 followed.  Each time a rule with file content is selected, the
@@ -199,7 +204,9 @@ or, after all rules have been excluded, an empty string.
 
 ## Nesting Semantics
 
-<span style="color: orange">There is a heirarchy of global and rule-specific, and nested files, so explain the nesting semantics: basically we override as we define more specifically on a rule, or in a file.  And a rule-specific setting for a file content and the same settings at the top of the file are two ways to do the same thing, the latter overriting the former if defined.</span>
+<span style="color: orange">**TODO improve this section**</span>
+
+There is a heirarchy of global and rule-specific, and nested files, so explain the nesting semantics: basically we override as we define more specifically on a rule, or in a file.  And a rule-specific setting for a file content and the same settings at the top of the file are two ways to do the same thing, the latter overriting the former if defined.
 
 
 ## Sequenced Responses
@@ -221,13 +228,28 @@ The actual number used in the sequence header makes no difference:
     even calls
 
 We can cycle through files like this:
-<span style="color: orange">Make sure this is tested.</span>
 
     --[ 0 ]--
     file:events/seq1.echo
     --[ 0 ]--
     file:events/seq2.echo
 
+We can also define multiple files and a default text value with the same semantics as described in #Multiple Locations.  For example:
+
+    --[ 0 ]--
+    file:magenta.echo
+    file:triangle.echo
+    --[ 0 ]--
+    file:blue.echo
+    text:not blue
+    --[ 0 ]--
+    file:tropical.echo
+    not tropical
+
+Finally, there is a compact variation on the syntax:
+
+    --[ 0 ]-- file:events/seq1.echo
+    --[ 0 ]-- file:events/seq2.echo
 
 For the purpose of determining how many times a rule has been matched,
 each rule is uniquely identified by a combination of
@@ -240,8 +262,6 @@ each rule is uniquely identified by a combination of
 
 Without this feature, the server is stateless.  With this feature in use,
 the server becomes stateful.  See also _Reset_ under #Server Commands below.
-
-<span style="color: orange">I think I need to accumulate the rule source instead of overwriting </span>
 
 
 ## Response Headers
@@ -407,4 +427,4 @@ List the rules.  For debugging only.
 - allow newlines anywhere in a rule (after selector type, selector target, pattern, status code, delay, or location)
 - add wildcard support for parameters and JSON fields (ie: "PARAM:\*" and "JSON:\*")
 - check for security of allowing any expression in the content which will be evaluated via str.format()
-
+- For more useful semantics of the sequenced content, perhaps the rule ID should be based on the path of nested file refs leading to the rule rather than just the name of the file containing the rule.  This would allow a file to be reused in multiple rules with the same selection criteria, but having been reached through a different path through the rules spec.  Not sure if this is needed.
