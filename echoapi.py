@@ -442,6 +442,8 @@ class RulesTemplate:
 
     def resolve_file(self, file, default_status_code, default_delay, headers, params, json, level):
         text = self.load_file(file)
+        if not file.endswith('.echo'):
+            return default_delay, {}, default_status_code, text
         text = self.resolve_value(text, headers, params, json)
         return self.select_content(file, text, default_status_code, default_delay, headers, params, json, level)
 

@@ -137,6 +137,18 @@ class TestResponseFile(TestEchoServer):
                      ok''',
                   200, 'ok')
 
+    def test_only_resolve_echo_files(self):
+        self.case('http://127.0.0.1:5000/?_echo_response=200 file:test/the_color_is.echo',
+            200, 'The color is green.\n')
+        self.case('http://127.0.0.1:5000/?_echo_response=200 file:test/the_color_is.txt',
+            200, 'The color is {color}.\n')
+
+    def test_evaluate_echo_files(self):
+        self.case('http://127.0.0.1:5000/?_echo_response=200 file:test/the_color_is_path.txt',
+            200, 'PATH: /./ The color is {color}.\nPATH: /./ {color} is the color.\n')
+        self.case('http://127.0.0.1:5000/?_echo_response=200 file:test/the_color_is_path.echo',
+            200, 'The color is green.\n')
+
 
 class TestParameters(TestEchoServer):
     def test_named_path_parameters(self):

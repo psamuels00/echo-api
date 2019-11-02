@@ -52,7 +52,8 @@ Wait for some number of milliseconds before responding to request.  For example:
 ## Template Content
 
 The response content is actually a template that may include named parameters or json
-fields in the request body.  To echo back the name of a "color" parameter, for example:
+fields in the request body.  str.format(\*\*data) is used as the templating system.
+To echo back the name of a "color" parameter, for example:
 
     http://127.0.0.1:5000/?color=aqua&_echo_response=200 { "color": "{color}" }
 
@@ -67,10 +68,14 @@ For example:
 
 ## Response Files
 
-Allow response to come from a file treated as a template wrt the named parameters.
-str.format(\*\*data) is used as the templating system.  For example:
+Allow response to come from a file, also treated as a template.  For example:
 
-    http://127.0.0.1:5000/id:{id}?_echo_response=200 file:samples/get/response.json
+    http://127.0.0.1:5000/id:{id}?_echo_response=200 file:samples/get/response.echo
+
+Template resolution only occurs for files with an .echo extension.  The content
+of other files is taken verbatim.  For example:
+
+    http://127.0.0.1:5000/sample/?_echo_response=200 file:samples/get/response.json
 
 
 ## Response Maps
@@ -190,16 +195,16 @@ This works even if there are no selection criteria:
 
 <span style="color: orange">**TODO improve this section**</span>
 
-The contents of a text file may contain a single text template,
+The contents of an .echo file may contain a single text template,
 or it may contain a complete rules specification, the same format
 as the \_echo_response parameter.
 
-There is no limit to the number of file references that may be
-followed.  Each time a rule with file content is selected, the
-contents of the file are loaded, treated as a template and
-resolved, and then parsed as a rules specification.  This
-continues until some unqualified text is defined for return,
-or, after all rules have been excluded, an empty string.
+There is no limit to the number of file references that may be followed.
+Each time a rule with .echo file content is selected, the contents of the
+file are loaded, treated as a template and resolved, and then parsed as a
+rules specification.  This continues until some unqualified text or
+non-.echo file is defined for return, or, after all rules have been
+excluded, an empty string.
 
 
 ## Nesting Semantics
@@ -420,7 +425,6 @@ List the rules.  For debugging only.
 
 ## TODO maybe
 
-- restrict treatment of text as template to inline text and files with .echo extension
 - add option for a user id (eg: _echo_user=psamuels/healthalgo-tracking-api) to set up a shared echo server
 - optimize by cacheing file contents as unresolved templates (and maybe the resolved instances too??)
 - optimize by precompiling all the static regular expressions, like EchoServer.param_pat
