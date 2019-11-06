@@ -5,14 +5,19 @@ from echoapi import RulesTemplate
 
 import requests
 import sys
+import time
 import timeit
 import unittest
+
+
+def reset_echo_server():
+    requests.get('http://127.0.0.1:5000/_echo_reset')
 
 
 def setUpModule():
     # reset the echo server, needed by TestMultipleResponses
     try:
-        requests.get('http://127.0.0.1:5000/_echo_reset')
+        reset_echo_server()
     except requests.exceptions.ConnectionError:
         print('Error connecting to Echo Server.', file=sys.stderr)
         print('Are you sure it is running?', file=sys.stderr)
@@ -520,7 +525,7 @@ class TestHeaderInResponseContent(TestEchoServer):
             200, 'The "team" header is "application/json"')
 
 
-class TestDelay(TestEchoServer):
+class TestDelayOption(TestEchoServer):
     def delay_case(self, expected_delay, *args):
         fun = lambda: self.case(*args)
         duration = int(timeit.timeit(fun, number=1) * 1000)
@@ -856,3 +861,64 @@ class TestMultipleResponses(TestEchoServer):
         self.case(url, 200, 'no matches\n')
         self.case(url, 200, '                 no match again')
 
+
+class TestAfterOption(TestEchoServer):
+    def after_case(self, expected_after, url, expected_status_code, expected_content, expected_after_content):
+        reset_echo_server()
+        for i in range(3):
+            self.case(url, expected_status_code, expected_content)
+        time.sleep(expected_after/1000)
+        #time.sleep(1)
+        self.case(url, expected_status_code, expected_after_content)
+
+    def test_global_after_only_first_line(self):
+        url = '''http://127.0.0.1:5000/?_echo_response=200 after=150ms
+                 PARAM:color /green/ Cheetah'''
+        self.after_case(180, url, 200, '', 'Cheetah')
+
+    def test_global_after_only_second_line(self):
+        url = '''http://127.0.0.1:5000/?_echo_response=200
+                 after=150ms PARAM:color /green/ Cheetah'''
+        self.after_case(180, url, 200, '', 'Cheetah')
+
+    def test_rule_specific_after_only(self):
+        url = '''http://127.0.0.1:5000/?_echo_response=200
+                 PARAM:color /green/ after=150ms Cheetah
+                 PARAM:color /green/ Leopard'''
+        self.after_case(180, url, 200, 'Leopard', 'Cheetah\n')
+
+    def test_global_and_rule_specific_after(self):
+        url = '''http://127.0.0.1:5000/?_echo_response=200
+                 after=150ms
+                 PARAM:color /green/ after=200ms Cheetah
+                 PARAM:color /green/             Leopard
+                 PARAM:color /green/ after=0ms   Jaguar'''
+        self.after_case(230, url, 200, 'Jaguar', 'Cheetah\n')
+
+    def test_global_and_rule_specific_after_path_selector(self):
+        # TODO In README, highlight this use of PATH:/./ to define a global after value
+        url = '''http://127.0.0.1:5000/?_echo_response=200
+                 after=150ms
+                 PATH: /./ after=200ms Cheetah
+                 PATH: /./             Leopard
+                 PATH: /./ after=0ms   Jaguar'''
+        self.after_case(230, url, 200, 'Jaguar', 'Cheetah\n')
+
+    def test_rule_specific_after_only_no_selector(self):
+        # TODO In README, highlight this subtle use of text: to ensure the Leopard line is not included as part of the first rule
+        url = '''http://127.0.0.1:5000/?_echo_response=200
+                 after=150ms Cheetah
+                 after=0ms text:Leopard'''
+        self.after_case(180, url, 200, 'Leopard', 'Cheetah\n')
+
+    def test_global_and_rule_specific_after_no_selector(self):
+        url = '''http://127.0.0.1:5000/?_echo_response=200
+                 after=150ms
+                 
+                 %23 bogus rule to ensure the next after= is not global
+                 PARAM:bogus /bogus/ bogus
+                 
+                 after=200ms text:Cheetah
+                             text:Leopard
+                 after=0ms   text:Jaguar'''
+        self.after_case(230, url, 200, 'Jaguar', 'Cheetah\n')
