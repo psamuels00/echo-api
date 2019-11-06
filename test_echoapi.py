@@ -868,7 +868,6 @@ class TestAfterOption(TestEchoServer):
         for i in range(3):
             self.case(url, expected_status_code, expected_content)
         time.sleep(expected_after/1000)
-        #time.sleep(1)
         self.case(url, expected_status_code, expected_after_content)
 
     def test_global_after_only_first_line(self):
