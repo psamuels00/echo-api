@@ -863,7 +863,7 @@ class TestMultipleResponses(TestEchoServer):
 
 
 class TestAfterOption(TestEchoServer):
-    def after_case(self, expected_after, url, expected_status_code, expected_content, expected_after_content):
+    def after_case(self, url, expected_status_code, expected_content, expected_after, expected_after_content):
         reset_echo_server()
         for i in range(3):
             self.case(url, expected_status_code, expected_content)
@@ -874,18 +874,18 @@ class TestAfterOption(TestEchoServer):
     def test_global_after_only_first_line(self):
         url = '''http://127.0.0.1:5000/?_echo_response=200 after=150ms
                  PARAM:color /green/ Cheetah'''
-        self.after_case(180, url, 200, '', 'Cheetah')
+        self.after_case(url, 200, '', 180, 'Cheetah')
 
     def test_global_after_only_second_line(self):
         url = '''http://127.0.0.1:5000/?_echo_response=200
                  after=150ms PARAM:color /green/ Cheetah'''
-        self.after_case(180, url, 200, '', 'Cheetah')
+        self.after_case(url, 200, '', 180, 'Cheetah')
 
     def test_rule_specific_after_only(self):
         url = '''http://127.0.0.1:5000/?_echo_response=200
                  PARAM:color /green/ after=150ms Cheetah
                  PARAM:color /green/ Leopard'''
-        self.after_case(180, url, 200, 'Leopard', 'Cheetah\n')
+        self.after_case(url, 200, 'Leopard', 180, 'Cheetah\n')
 
     def test_global_and_rule_specific_after(self):
         url = '''http://127.0.0.1:5000/?_echo_response=200
@@ -893,23 +893,21 @@ class TestAfterOption(TestEchoServer):
                  PARAM:color /green/ after=200ms Cheetah
                  PARAM:color /green/             Leopard
                  PARAM:color /green/ after=0ms   Jaguar'''
-        self.after_case(230, url, 200, 'Jaguar', 'Cheetah\n')
+        self.after_case(url, 200, 'Jaguar', 230, 'Cheetah\n')
 
     def test_global_and_rule_specific_after_path_selector(self):
-        # TODO In README, highlight this use of PATH:/./ to define a global after value
         url = '''http://127.0.0.1:5000/?_echo_response=200
                  after=150ms
                  PATH: /./ after=200ms Cheetah
                  PATH: /./             Leopard
                  PATH: /./ after=0ms   Jaguar'''
-        self.after_case(230, url, 200, 'Jaguar', 'Cheetah\n')
+        self.after_case(url, 200, 'Jaguar', 230, 'Cheetah\n')
 
     def test_rule_specific_after_only_no_selector(self):
-        # TODO In README, highlight this subtle use of text: to ensure the Leopard line is not included as part of the first rule
         url = '''http://127.0.0.1:5000/?_echo_response=200
                  after=150ms Cheetah
                  after=0ms text:Leopard'''
-        self.after_case(180, url, 200, 'Leopard', 'Cheetah\n')
+        self.after_case(url, 200, 'Leopard', 180, 'Cheetah\n')
 
     def test_global_and_rule_specific_after_no_selector(self):
         url = '''http://127.0.0.1:5000/?_echo_response=200
@@ -921,4 +919,4 @@ class TestAfterOption(TestEchoServer):
                  after=200ms text:Cheetah
                              text:Leopard
                  after=0ms   text:Jaguar'''
-        self.after_case(230, url, 200, 'Jaguar', 'Cheetah\n')
+        self.after_case(url, 200, 'Jaguar', 230, 'Cheetah\n')

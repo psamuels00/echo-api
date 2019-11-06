@@ -48,6 +48,19 @@ Wait for some number of milliseconds before responding to request.  For example:
 
     http://127.0.0.1:5000/?_echo_response=200 delay=5000ms ok, eventually
 
+i
+## After
+
+
+<span style="color: orange">**TODO explain this option**</span>
+
+Use a bogus rule to prevent a rule-specific value from being applied globally, eg: PATH:/./
+See test_global_and_rule_specific_after_no_selector.
+
+Use the explicit text: to ensure a text rule with an after=XXms is interpreted as a rule
+rather than as part of the currently being parsed text rule.
+See test_rule_specific_after_only_no_selector.
+
 
 ## Template Content
 
