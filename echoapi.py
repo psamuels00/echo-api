@@ -170,6 +170,7 @@ class ResponseParser:
         self.lines = None               # used by parse() to support parsing elements at beginning of line
         self.is_sequenced = False       # used by parse() to know if text is part of sequenced content
         self.rules = []                 # returned by parse(), this is the primary product of parsing
+        self.global_scope = True
 
     def parse(self, text):
         self.lines = self.parse_response_into_lines(text)
@@ -202,12 +203,14 @@ class ResponseParser:
             pass
 
         # a match here implies there is no sequenced content yet
-        elif not self.rules and self.begins_with_status_code(line):
+        elif self.global_scope and self.begins_with_status_code(line):
             pass
-        elif not self.rules and self.begins_with_delay(line):
+        elif self.global_scope and self.begins_with_delay(line):
             pass
-        elif not self.rules and self.begins_with_after(line):
+        elif self.global_scope and self.begins_with_after(line):
             pass
+        elif self.begins_with_separator(line):
+            self.global_scope = False
 
         # a match here ends parsing of sequenced content and begins a new rule
         elif self.is_matching_header_rule(line):
@@ -242,6 +245,9 @@ class ResponseParser:
         # a match here creates a new rule or (if part of sequenced content) starts a new element in the current sequence
         else:
             self.add_rule_with_implied_text_location(line)
+
+        if self.rules:
+            self.global_scope = False
 
     def currently_processing_a_text_rule(self):
         return self.rules \
@@ -299,6 +305,15 @@ class ResponseParser:
 
     def is_blank(self, line):
         return re.match(r'\s*$', line)
+
+    def begins_with_separator(self, line):
+        # match 2 or more hyphens, not followed by "[ N ]--" (since "--[ N ]--" is how we start sequenced content
+        m = re.match(r'\s*-{2,}(?!\[\s*\d+\s*\]--)\s*(.*)', line, re.DOTALL)
+        if m:
+            if len(m.group(1)) > 0:
+                self.lines.insert(0, m.group(1))
+            return True
+        return False
 
     def begins_with_status_code(self, line):
         m = re.match(r'\s*(\d{3})\b\s*(.*)', line, re.DOTALL)
@@ -382,8 +397,8 @@ class ResponseParser:
 
     def add_rule_with_implied_text_location(self, line):
         return self.add_if_match(line,
-            r'((\d{3})\b)?(\s*delay=(\d+)ms)?(after=(\d+)ms\s*)?(.*)',
-            (0,0,0,2,               4,              6,       0, 7   ),
+            r'(\s*(\d{3})\b)?(\s*delay=(\d+)ms)?(\s*after=(\d+)ms)?(.*)',
+            (0,0,0,2,                  4,                 6,    0, 7   ),
             reset_sequence=False)
 
 

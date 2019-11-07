@@ -875,6 +875,12 @@ class TestAfterOption(TestEchoServer):
                  PARAM:color /green/ Cheetah'''
         self.after_case(url, 200, '', 180, 'Cheetah')
 
+    def test_global_after_only_first_line_separator(self):
+        url = '''http://127.0.0.1:5000/?_echo_response=200 after=150ms
+                 --------
+                 PARAM:color /green/ Cheetah'''
+        self.after_case(url, 200, '', 180, 'Cheetah')
+
     def test_global_after_only_second_line(self):
         url = '''http://127.0.0.1:5000/?_echo_response=200
                  after=150ms PARAM:color /green/ Cheetah'''
@@ -902,19 +908,23 @@ class TestAfterOption(TestEchoServer):
                  PATH: /./ after=0ms   Jaguar'''
         self.after_case(url, 200, 'Jaguar', 230, 'Cheetah\n')
 
+    def test_rule_specific_after_only_no_selector_explicit_zero(self):
+        url = '''http://127.0.0.1:5000/?_echo_response=200
+                 ----
+                 after=150ms Cheetah
+                 after=0ms   text:Leopard'''
+        self.after_case(url, 200, 'Leopard', 180, 'Cheetah\n')
+
     def test_rule_specific_after_only_no_selector(self):
         url = '''http://127.0.0.1:5000/?_echo_response=200
+                 ----
                  after=150ms Cheetah
-                 after=0ms text:Leopard'''
+                             text:Leopard'''
         self.after_case(url, 200, 'Leopard', 180, 'Cheetah\n')
 
     def test_global_and_rule_specific_after_no_selector(self):
         url = '''http://127.0.0.1:5000/?_echo_response=200
-                 after=150ms
-                 
-                 %23 bogus rule to ensure the next after= is not global
-                 PARAM:bogus /bogus/ bogus
-                 
+                 after=150ms --
                  after=200ms text:Cheetah
                              text:Leopard
                  after=0ms   text:Jaguar'''
