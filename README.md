@@ -54,9 +54,6 @@ i
 
 <span style="color: orange">**TODO explain this option**</span>
 
-Use a bogus rule to prevent a rule-specific value from being applied globally, eg: PATH:/./
-See test_global_and_rule_specific_after_no_selector.
-
 Use the explicit text: to ensure a text rule with an after=XXms is interpreted as a rule
 rather than as part of the currently being parsed text rule.
 See test_rule_specific_after_only_no_selector.
@@ -149,14 +146,6 @@ For example, the following rules specification returns one of 3 values:
     text: OK
 
 
-## Rule-Specific Overrides
-
-The status and delay can both be defined specifically for a rule to
-override the default or global value described above.  For example:
-
-<span style="color: orange">**TODO example**</span>
-
-
 ## Template Rules Spec
 
 In addition to being used to select rules and define the response content, parameters
@@ -202,6 +191,20 @@ This works even if there are no selection criteria:
     file:nomatches.echo
     file:stillnomatches.echo
     text:no match
+
+
+## Attribute Scope
+
+The status code, delay, and after can be defined specifically for a rule to
+override the default or global value described above.  For example:
+
+<span style="color: orange">**TODO example**</span>
+
+The global values are parsed from the beginning of the line.  To avoid ambiguity
+for the first rule, a separator line may be added after the global attribute
+definitions.  For example:
+
+<span style="color: orange">**TODO example**</span>
 
 
 ## Nested Templates
@@ -407,7 +410,7 @@ They may also be included to add visual appeal, if you're into that.  For exampl
 ## Server Commands
 
 Reset the server.  This causes the cache to be cleared.  It is only
-needed when using sequenced responses.
+needed when using sequenced responses or the "after" attribute.
 
     http://127.0.0.1:5000/_echo_reset
 
