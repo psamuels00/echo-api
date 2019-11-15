@@ -260,7 +260,7 @@ class ResponseParser:
         selector_target = '' if selector_target is None else selector_target
         status_code = self.status_code if status_code is None else int(status_code)
         delay = self.delay if delay is None else int(delay)
-        after = self.after if after is None else after
+        after = self.after if after is None else int(after)
         location = [ [location or 'text'] ] # a list to support sequenced content
         headers = [] # RulesAdjuster moves entries from values to headers, a list to support sequenced content
         content = [value] # content is stored as a list of values, here initialized with the first value
@@ -486,7 +486,7 @@ class RulesTemplate:
     def resolve_file(self, file, default_status_code, default_delay, default_after, headers, params, json, level):
         text = self.load_file(file)
         if not file.endswith('.echo'):
-            return default_delay, {}, default_status_code, text
+            return default_delay, default_status_code, {}, text
         text = self.resolve_value(text, headers, params, json)
         return self.select_content(file, text, default_status_code, default_delay, default_after, headers, params, json, level)
 
@@ -500,7 +500,7 @@ class RulesTemplate:
         content = ''
 
         if rules.num_rules() == 0:
-            return delay, headers, status, content
+            return delay, status, headers, content
 
         content = None
 
@@ -522,10 +522,10 @@ class RulesTemplate:
 
             if rule.location == 'file':
                 file = content.strip()
-                delay, headers, status, content = self.resolve_file(
+                delay, status, headers, content = self.resolve_file(
                     file, status, delay, after, headers, params, json, level + 1)
 
-        return delay, headers, status, content
+        return delay, status, headers, content
 
 
 class EchoServer:
@@ -578,7 +578,7 @@ class EchoServer:
         json = self.json
 
         template = RulesTemplate(self.request_path, content)
-        delay, headers, status, content = template.resolve(headers, params, json)
+        delay, status, headers, content = template.resolve(headers, params, json)
         resp = Response(content, headers=headers, status=status)
 
         return delay, resp
@@ -610,7 +610,7 @@ def list_rules(): # for debugging
     keys = Rules.rule_match_count.keys()
     for k in sorted(keys):
         v = Rules.rule_match_count[k]
-        print(f'@@@ {v:5} {k}')
+        print(f'RULE: {v:5} {k}')
     return 'ok'
 
 

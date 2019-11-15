@@ -863,7 +863,8 @@ class TestMultipleResponses(TestEchoServer):
 
 
 class TestAfterOption(TestEchoServer):
-    def after_case(self, url, expected_status_code, expected_content, expected_after, expected_after_content):
+    def after_case(self, url, expected_content, expected_after, expected_after_content):
+        expected_status_code = 200
         reset_echo_server()
         for i in range(3):
             self.case(url, expected_status_code, expected_content)
@@ -873,32 +874,33 @@ class TestAfterOption(TestEchoServer):
     def test_global_after_only_first_line(self):
         url = '''http://127.0.0.1:5000/?_echo_response=200 after=150ms
                  PARAM:color /green/ Cheetah'''
-        self.after_case(url, 200, '', 180, 'Cheetah')
+        self.after_case(url, '', 180, 'Cheetah')
 
     def test_global_after_only_first_line_separator(self):
         url = '''http://127.0.0.1:5000/?_echo_response=200 after=150ms
                  --------
                  PARAM:color /green/ Cheetah'''
-        self.after_case(url, 200, '', 180, 'Cheetah')
+        self.after_case(url, '', 180, 'Cheetah')
 
     def test_global_after_only_second_line(self):
         url = '''http://127.0.0.1:5000/?_echo_response=200
                  after=150ms PARAM:color /green/ Cheetah'''
-        self.after_case(url, 200, '', 180, 'Cheetah')
+        self.after_case(url, '', 180, 'Cheetah')
 
     def test_rule_specific_after_only(self):
         url = '''http://127.0.0.1:5000/?_echo_response=200
                  PARAM:color /green/ after=150ms Cheetah
                  PARAM:color /green/ Leopard'''
-        self.after_case(url, 200, 'Leopard', 180, 'Cheetah\n')
+        self.after_case(url, 'Leopard', 180, 'Cheetah\n')
 
     def test_global_and_rule_specific_after(self):
+
         url = '''http://127.0.0.1:5000/?_echo_response=200
                  after=150ms
                  PARAM:color /green/ after=200ms Cheetah
                  PARAM:color /green/             Leopard
                  PARAM:color /green/ after=0ms   Jaguar'''
-        self.after_case(url, 200, 'Jaguar', 230, 'Cheetah\n')
+        self.after_case(url, 'Jaguar', 230, 'Cheetah\n')
 
     def test_global_and_rule_specific_after_path_selector(self):
         url = '''http://127.0.0.1:5000/?_echo_response=200
@@ -906,21 +908,21 @@ class TestAfterOption(TestEchoServer):
                  PATH: /./ after=200ms Cheetah
                  PATH: /./             Leopard
                  PATH: /./ after=0ms   Jaguar'''
-        self.after_case(url, 200, 'Jaguar', 230, 'Cheetah\n')
+        self.after_case(url, 'Jaguar', 230, 'Cheetah\n')
 
     def test_rule_specific_after_only_no_selector_explicit_zero(self):
         url = '''http://127.0.0.1:5000/?_echo_response=200
                  ----
                  after=150ms Cheetah
                  after=0ms   text:Leopard'''
-        self.after_case(url, 200, 'Leopard', 180, 'Cheetah\n')
+        self.after_case(url, 'Leopard', 180, 'Cheetah\n')
 
     def test_rule_specific_after_only_no_selector(self):
         url = '''http://127.0.0.1:5000/?_echo_response=200
                  ----
                  after=150ms Cheetah
                              text:Leopard'''
-        self.after_case(url, 200, 'Leopard', 180, 'Cheetah\n')
+        self.after_case(url, 'Leopard', 180, 'Cheetah\n')
 
     def test_global_and_rule_specific_after_no_selector(self):
         url = '''http://127.0.0.1:5000/?_echo_response=200
@@ -928,4 +930,24 @@ class TestAfterOption(TestEchoServer):
                  after=200ms text:Cheetah
                              text:Leopard
                  after=0ms   text:Jaguar'''
-        self.after_case(url, 200, 'Jaguar', 230, 'Cheetah\n')
+        self.after_case(url, 'Jaguar', 230, 'Cheetah\n')
+
+    def test_file_global_override_after_on_rule(self):
+        url = '''http://127.0.0.1:5000/?_echo_response=200
+                 after=150ms --
+                 file:test/comment_before_rules.echo
+                 Bengal Tiger
+                 after=0ms text:ok'''
+        self.after_case(url, 'ok', 180, 'the sky is blue\n')
+
+    def test_file_global_override_after_in_content_no_selector(self):
+        url = '''http://127.0.0.1:5000/?_echo_response=200
+                 after=150ms --
+                 Bengal Tiger
+                 file:test/after/global_override.echo
+                 '''
+        # TODO make this work instead:
+        # self.after_case(url, 'Alfalfa Sprouts\n', 180, 'Bengal Tiger\n')
+
+        self.after_case(url, '', 180, 'Bengal Tiger\n')
+

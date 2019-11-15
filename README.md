@@ -9,6 +9,8 @@ directly in the request, or in a file referenced by the request.
 
 <span style="color: orange">**TODO**</span> _Update the remainder of this section._
 
+Mention rules specification.
+
 The response specification is orthogonal in the sense that file content is
 interpreted like content included in the request: it may contain selection
 rules and nested file references.  Also, any part of the \_echo_response or
@@ -433,17 +435,16 @@ List the rules.  For debugging only.
 
 ## TODO
 
-- add error checking *everywhere* (including cirular file references), and add unit tests for each condition
-
-
-## TODO probably
-
+- change file: to FILE: and text: to TEXT:
+- split into separate files
+- version manage the rules specification format
 - add support for an http location in addition to file and text
-- add support for use as a library in addition to use as a service
+- add error checking *everywhere* (including cirular file references), and add unit tests for each condition
 
 
 ## TODO maybe
 
+- add support for use as a library in addition to use as a service
 - add option for a user id (eg: _echo_user=psamuels/healthalgo-tracking-api) to set up a shared echo server
 - optimize by cacheing file contents as unresolved templates (and maybe the resolved instances too??)
 - optimize by precompiling all the static regular expressions, like EchoServer.param_pat
