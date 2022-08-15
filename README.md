@@ -35,11 +35,18 @@ curl http://127.0.0.1:5000/?_echo_response=red.green.blue; echo
 
 # stop server
 ^C
+```
 
-# start server in Docker container
+## Usage in Docker
+
+```
+# start server
 docker build -t echo-api .
 container_id=`docker run -dp 5000:5000 echo-api`
 docker logs -f $container_id
+
+# run tests
+docker exec $container_id pytest
 
 # use the service
 curl http://127.0.0.1:5000/?_echo_response=red.green.blue.from.Docker; echo
