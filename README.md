@@ -1,6 +1,12 @@
 # Echo API
 
-Receive a request and return a response defined by a parameter of the request.
+Mock API server with dynamic response capabilities.
+
+Responses are predefined, made available to the server through files deployed
+with the server, or supplied with each request as a parameter.  Dynamic
+responses are selected based on some addressable component of the request
+matching a regular expression pattern, including url and path parameters,
+elements of a json body, the raw body, or a request header.
 
 The response status code and content can be included in the request.  Various
 type of request parameters are recognized and may be used to select from
