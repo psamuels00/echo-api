@@ -564,7 +564,12 @@ class EchoServer:
 
     def parse_json_body(self):
         self.json = None  # Box of json object from the request body
-        json = request.get_json() or {}
+
+        try:
+            json = request.get_json()
+        except:
+            json = {}
+
         self.json = Box(json)
 
     def all_params(self):
