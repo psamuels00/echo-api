@@ -13,6 +13,65 @@ type of request parameters are recognized and may be used to select from
 multiple options of content to be returned.  Response content may be defined
 directly in the request, or in a file referenced by the request.
 
+## Usage summary
+```
+# clone repo
+git@github.com:psamuels00/echo-api.git
+cd echo-api
+
+# set up Python virtual environment
+pyenv virtualenv 3.7.3 echo-api
+pyenv local echo-api
+pip install -r requirements.txt
+
+# start server
+./server-run-dev.sh
+
+# run tests
+pytest  # in a different terminal
+
+# use the service
+curl http://127.0.0.1:5000/?_echo_response=red.green.blue; echo
+
+# stop server
+^C
+
+# start server in Docker container
+docker build -t echo-api .
+container_id=`docker run -dp 5000:5000 echo-api`
+docker logs -f $container_id
+
+# use the service
+curl http://127.0.0.1:5000/?_echo_response=red.green.blue.from.Docker; echo
+
+# stop server
+docker stop $container_id
+docker rm $container_id
+docker rmi echo-api
+```
+
+## URL Encoding
+
+```
+urlencode() {
+    python3 -c "import sys, urllib.parse as ul; print(ul.quote_plus(sys.argv[1]))" "$1"
+}
+
+curl "http://127.0.0.1:5000/?_echo_response=`urlencode 'any value'`"; echo
+curl "http://127.0.0.1:5000/?color=aqua&_echo_response=`urlencode '200 { "color": "{color}" }'`"; echo
+
+curly() {
+    curl "http://127.0.0.1:5000/${3}?${2}_echo_response=`urlencode "$1"`"
+    echo
+}
+
+curly 'any value'
+curly '200 { "color": "{color}" }' 'color=aqua&'
+
+```
+
+## Features
+
 <span style="color: orange">**TODO**</span> _Update the remainder of this section._
 
 Mention rules specification.
