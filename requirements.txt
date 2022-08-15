@@ -1,3 +1,4 @@
 flask
 pytest
 python-box
+requests
