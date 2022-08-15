@@ -16,7 +16,7 @@ import unittest
 
 
 def reset_echo_server():
-    requests.get('http://127.0.0.1:5000/_echo_reset')
+    requests.get('http://0.0.0.0:5000/_echo_reset')
 
 
 def setUpModule():
