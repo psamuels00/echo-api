@@ -530,8 +530,8 @@ class RulesTemplate:
 
 class EchoServer:
 
-    param_pat = re.compile('^(\w+):(.*)$')
-    param_value_pat = re.compile(':\w+')
+    param_pat = re.compile(r'^(\w+):(.*)$')
+    param_value_pat = re.compile(r':\w+')
 
     def __init__(self, path):
         self.request_path = re.sub(self.param_value_pat, '', path)
