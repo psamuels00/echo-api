@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 from box import Box
+from collections import OrderedDict
+from enum import Enum
 from flask import Flask, request, Response
 
 import os
@@ -12,71 +14,39 @@ import typing
 app = Flask(__name__)
 
 
+def load_file(filepath):
+    with open(filepath, 'r') as fh:
+        text = fh.read()
+    return text
+
+
 class Rule(typing.NamedTuple):
 
-    rule_source: str       # '' if directly from _echo_response, or name of file otherwise
-    after: int             # eg: 200, represents number of milliseconds after start/reset of echo server
-    selector_type: str     # one of { PATH, HEADER, PARAM, JSON, BODY }
-    selector_target: str   # name of header, parameter, or json field
-    pattern: str           # eg: /test/ or /Test/i or !/test/
-    status_code: int       # eg: 200
-    delay: int             # eg: 200, represents number of milliseconds to delay
-    location: list         # list of values, each one of { file, text }
-    headers: list          # [ {},... ]
-    values: list           # [ [...],... ]
+    # rule meta data
+    source: str         # where the rule is defined, '' if directly from _echo_response, name of file otherwise
+    location: str       # where the content is defined, one of { file, text }
+
+    # selection criteria
+    select_type: str    # one of { PATH, HEADER, PARAM, JSON, BODY }
+    select_target: str  # name of header, parameter, or json field
+    select_pattern: str # eg: /test/ or /Test/i or !/test/
+    select_after: int   # eg: 200, represents number of milliseconds after start/reset of echo server
+
+    # response info
+    delay: int          # eg: 200, represents number of milliseconds to delay before sending response
+    status_code: int    # status code to include in response, eg: 200
+    headers: dict       # headers to include in response
+    content: str        # content to include in response
 
     def unique_id(self, request_path):
-        after = str(self.after or 0)
-        selector_type = '' if self.selector_type is None else self.selector_type
-        selector_target = '' if self.selector_target is None else self.selector_target
-        pattern = '' if self.pattern is None else self.pattern
-        return ':'.join((request_path, self.rule_source, selector_type, selector_target, pattern, after))
+        select_after = str(self.select_after or 0)
+        select_type = '' if self.select_type is None else self.select_type
+        select_target = '' if self.select_target is None else self.select_target
+        select_pattern = '' if self.select_pattern is None else self.select_pattern
+        return ':'.join((request_path, self.source, select_type, select_target, select_pattern, select_after))
 
-    def rule4location(self, location, headers, values):
-        return Rule(
-            self.rule_source,
-            self.after,
-            self.selector_type,
-            self.selector_target,
-            self.pattern,
-            self.status_code,
-            self.delay,
-            location,
-            headers,
-            values
-        )
-
-    def at_offset(self, offset):
-        locations = self.location[offset]
-        values = self.values[offset]
-
-        rules = []
-        while locations and locations[0] == 'file':
-            headers = self.headers[offset]
-            rule = self.rule4location(locations.pop(0), headers, values.pop(0))
-            rules.append(rule)
-
-        if values:
-            headers = self.headers[offset]
-            rule = self.rule4location(locations.pop(0), headers, values)
-            rules.append(rule)
-
-        return rules
-
-
-class Rules:
-
-    last_reset_time_in_millis = 0
-    rule_match_count = {}
-    current_time_in_millis = lambda: int(round(time.time() * 1000))
-
-    def __init__(self, request_path, rule_source, text, default_status_code, default_delay, default_after):
-        self.request_path = request_path
-        responseParser = ResponseParser(rule_source, default_status_code, default_delay, default_after)
-        self.status_code, self.delay, self.rules = responseParser.parse(text)
-
-    def num_rules(self):
-        return len(self.rules)
+    def matches_selection_criteria(self):
+        pass
 
     def matches(self, text, rule_pattern):
         # set case-sensitive flag
@@ -143,13 +113,275 @@ class Rules:
             if millis_since_reset <= int(rule.after or 0):
                 apply_rule = False
 
-            if apply_rule:
-                # we get a list of rules here since there could be multiple locations in sequenced content
-                rules = self.select_content_from_list(rule)
-                # once a match is made on one rule, we can stop checking for more rules so all
-                # the rules will not necessarily be yielded or "pulled through" via next()
-                for rule in rules:
-                    yield rule
+            return apply_rule
+
+
+class TextRule(Rule):
+    pass
+
+
+class StaticFileRule(Rule):
+    pass
+
+
+class FileRule(Rule):
+    pass
+
+
+class SequenceRule(Rule):
+    pass
+
+
+class RulesSpec:
+
+    class State(Enum):
+        INIT = 0
+        GLOBAL = 1
+        RULE = 2
+        TEXT = 3
+        SEQ = 4
+        SEQ_FILE = 5
+        SEQ_TEXT = 6
+
+    # class SelectorType(Enum):
+    #     HEADER = 0
+    #     PARAM = 1
+    #     JSON = 2
+    #     PATH = 3
+    #     BODY = 4
+
+    class Globals:
+        def __init__(self, status_code, delay, after, headers):
+            self.status_code = status_code
+            self.delay = delay
+            self.after = after
+            self.headers = {} if headers is None else headers.copy()
+
+    class RuleParts:
+        def __init__(self):
+            self.select_type = None
+            self.select_target = None
+            self.select_pattern = None
+            self.status_code = None
+            self.delay = None
+            self.after = None
+            self.headers = {}
+            self.content = [] # [line,...]
+
+    def __init__(self, status_code=200, delay=0, after=0, headers=None):
+        self.state = self.State.INIT
+        self.globals = self.Globals(status_code, delay, after, headers)
+        self.ruleParts = self.RuleParts()
+        self.line = None
+        self.rules = []
+
+    def split_text_into_lines(self, text):
+        # remove one of [|@>] from beginning of text to avoid creating an extra blank line
+        # by the sub() command below
+        m = re.match(r'[|@>]\s*(.*)', text, re.DOTALL)
+        if m:
+            text = m.group(1)
+
+        # replace one of [|@>] with newline if it precedes a selector type or location specifier
+        multiline = re.sub(r'[|@>]\s*((HEADER|PATH|PARAM|JSON|BODY|text|file):)', r'\n\1', text)
+
+        return multiline.splitlines(keepends=True)
+
+    def parse(self, text):
+        lines = self.split_text_into_lines(text)
+
+        for self.line in lines:
+            self.parse_line()
+
+            while self.rules:
+                content = self.process_rule()
+                if content is not None:
+                    return content
+
+        return None
+
+    def process_rule(self):
+        content = None
+
+        rule = self.rules.pop(0)
+        if not self.matches_selection_criteria(rule):
+            pass
+        elif rule is TextRule:
+            content = ''.join(rule.content)
+        elif rule is StaticFileRule:
+            filepath = rule.content[0]
+            content = load_file(filepath)
+        elif rule is FileRule:
+            content = rule.content # TODO
+        elif rule is SequenceRule:
+            content = rule.content # TODO
+
+        return content
+
+    def parse_line(self):
+        while self.line:
+            self.parse_line_part()
+
+    def parse_line_part(self):
+        if self.match_status_code():
+            pass
+        elif self.match_delay():
+            pass
+        elif self.match_after():
+            pass
+        elif self.match_header():
+            pass
+        elif self.match_selector():
+            pass
+        elif self.match_file():
+            pass
+
+    def create_text_rule(self):
+        pass # TODO
+
+    def create_file_rule(self, filepath):
+        if filepath.endswith('.echo'):
+            pass # TODO
+        else:
+            pass # TODO
+
+    def match_status_code(self):
+        if self.state in (self.State.SEQ, self.State.SEQ_FILE, self.State.SEQ_TEXT):
+            # input is read as part of content
+            return False
+
+        m = re.match(r'\s*(\d{3})\b\s*(.*)', self.line)
+        if not m:
+            return False
+
+        if self.state in (self.State.INIT, self.State.GLOBAL):
+            self.globals.status_code = int(m.group(1))
+            self.state = self.State.GLOBAL
+        else:
+            # self.state in (self.State.RULE, self.State.SEQ):
+            self.ruleParts.status_code = int(m.group(1))
+        self.line = m.group(2)
+
+        return True
+
+    def match_delay(self):
+        if self.state in (self.State.TEXT, self.State.SEQ_FILE, self.State.SEQ_TEXT):
+            # input is read as part of content
+            return False
+
+        m = re.match(r'\s*delay=(\d+)ms\s*(.*)', self.line)
+        if not m:
+            return False
+
+        if self.state in (self.State.INIT, self.State.GLOBAL):
+            self.globals.delay = int(m.group(1))
+            self.state = self.State.GLOBAL
+        else:
+            # self.state in (self.State.RULE, self.State.SEQ):
+            self.ruleParts.delay = int(m.group(1))
+        self.line = m.group(2)
+
+        return True
+
+    def match_after(self):
+        if self.state in (self.State.TEXT, self.State.SEQ_FILE, self.State.SEQ_TEXT):
+            # input is read as part of content
+            return False
+
+        m = re.match(r'\s*after=(\d+)ms\s*(.*)', self.line)
+        if not m:
+            return False
+
+        if self.state in (self.State.INIT, self.State.GLOBAL):
+            self.globals.after = int(m.group(1))
+            self.state = self.State.GLOBAL
+        else:
+            # self.state in (self.State.RULE, self.State.SEQ):
+            self.ruleParts.after = int(m.group(1))
+        self.line = m.group(2)
+
+        return True
+
+    def match_header(self):
+        if self.state in (self.State.TEXT, self.State.SEQ_FILE, self.State.SEQ_TEXT):
+            # input is read as part of content
+            return False
+
+        m = re.match(r'\s*HEADER:\s*(.*?)=(.*)', self.line)
+        if not m:
+            return False
+
+        if self.state in (self.State.INIT, self.State.GLOBAL):
+            self.globals.headers[m.group(1)] = m.group(2)
+            self.state = self.State.GLOBAL
+        else:
+            # self.state in (self.State.RULE, self.State.SEQ):
+            self.ruleParts.headers[m.group(1)] = m.group(2)
+        self.line = ''
+
+        return True
+
+    def match_selector(self):
+        m = re.match(r'\s*(HEADER|PARAM|JSON|PATH|BODY):\s*(.*?)\s*(!?/.*?/i?)\s*(.*)', self.line)
+        if not m:
+            return False
+
+        if self.state in (self.State.RULE, self.State.TEXT, self.State.SEQ, self.State.SEQ_FILE, self.State.SEQ_TEXT):
+            self.create_text_rule()
+        self.state = self.State.RULE
+
+        self.ruleParts.select_type = m.group(1)
+        self.ruleParts.select_target = m.group(2)
+        self.ruleParts.select_pattern = m.group(3)
+        self.line = m.group(4)
+
+        return True
+
+    def match_file(self):
+        m = re.match(r'\s*file:\s*(.*?)\s*', self.line)
+        if not m:
+            return False
+
+        filepath = m.group(1)
+        self.line = ''
+
+        if self.state in (self.State.INIT, self.State.GLOBAL):
+            self.create_file_rule(filepath)
+            self.state = self.State.RULE
+        elif self.state == self.State.RULE:
+            self.create_file_rule(filepath)
+        elif self.state == self.State.TEXT:
+            self.create_text_rule()
+            self.create_file_rule(filepath)
+            self.state = self.State.RULE
+        elif self.state == self.State.SEQ:
+            self.create_file_rule(filepath)
+        elif self.state == self.State.SEQ_TEXT:
+            self.create_text_rule()
+            self.create_file_rule(filepath)
+
+
+# -------------------------------------------------------------------------------------------------------------------- #
+# -------------------------------------------------------------------------------------------------------------------- #
+# -------------------------------------------------------------------------------------------------------------------- #
+# -------------------------------------------------------------------------------------------------------------------- #
+# -------------------------------------------------------------------------------------------------------------------- #
+
+
+class Rules:
+
+    last_reset_time_in_millis = 0
+    rule_match_count = {}
+    current_time_in_millis = lambda: int(round(time.time() * 1000))
+
+    def __init__(self, request_path, rule_source, text, default_status_code, default_delay, default_after):
+        self.request_path = request_path
+        responseParser = ResponseParser(rule_source, default_status_code, default_delay, default_after)
+        self.status_code, self.delay, self.rules = responseParser.parse(text)
+
+    def num_rules(self):
+        return len(self.rules)
+
 
 
 class ResponseParser:
@@ -179,23 +411,7 @@ class ResponseParser:
             line = self.lines.pop(0)
             self.parse_line(line)
 
-        is_from_file = False if self.rule_source == '' else True
-        rulesAdjuster = RulesAdjuster(is_from_file, self.rules)
-        rulesAdjuster.adjust()
-
         return self.status_code, self.delay, self.rules
-
-    def parse_response_into_lines(self, text):
-        # remove one of [|@>] from beginning of text to avoid creating an extra blank line
-        # by the sub() command below
-        m = re.match(r'[|@>]\s*(.*)', text, re.DOTALL)
-        if m:
-            text = m.group(1)
-
-        # replace one of [|@>] with newline if it precedes a selector type or location specifier
-        multiline = re.sub(r'[|@>]\s*((HEADER|PATH|PARAM|JSON|BODY|text|file):)', r'\n\1', text)
-
-        return multiline.splitlines(keepends=True)
 
     def parse_line(self, line):
         # comments are completely ignored, period
@@ -232,10 +448,18 @@ class ResponseParser:
         elif self.is_matching_rule_with_explicit_location(line):
             pass
 
+        # a match here creates a new text rule, or adds header to existing text rule currently being processed
+        elif self.is_matching_header_content(line):
+            pass
+
         # a match here adds to an existing text rule, whether part of sequenced content or not
         elif self.currently_processing_a_text_rule():
+            # remove whitespace before first line of content, unless it is from a file
+            if self.rule_source == '' and len(self.rules[-1].values[-1]) == 0:
+                line = line.lstrip()
+
             # add to the currently being parsed element of sequenced content
-            # any extra text is appended to value here, and further parsed by RulesAdjuster later
+            # any extra text is appended to value here
             self.rules[-1].values[-1].append(line)
 
         # blank lines are ignored before any rules or after a file rule
@@ -255,16 +479,15 @@ class ResponseParser:
             and len(self.rules[-1].location[-1]) \
             and self.rules[-1].location[-1][-1] == 'text'
 
-    def add_rule(self, selector_type, selector_target, pattern, status_code, delay, after, location, value):
+    def add_rule(self, selector_type, selector_target, pattern, status_code, delay, after, location):
         rule_source = self.rule_source
         selector_target = '' if selector_target is None else selector_target
         status_code = self.status_code if status_code is None else int(status_code)
         delay = self.delay if delay is None else int(delay)
         after = self.after if after is None else int(after)
         location = [ [location or 'text'] ] # a list to support sequenced content
-        headers = [] # RulesAdjuster moves entries from values to headers, a list to support sequenced content
-        content = [value] # content is stored as a list of values, here initialized with the first value
-        values = [content] # to support sequenced content, we wrap the first content value in a list
+        headers = [ {} ] # dictionary of headers, a list to support sequenced content
+        values = [ [] ] # content is stored as a list of values
 
         rule = Rule(
             rule_source,      # file that rule comes from, or '' if directly from _echo_response param value
@@ -289,7 +512,12 @@ class ResponseParser:
             args = [ m.group(n) if n else None
                      for n in groups ]
 
+            # remove whitespace before first line of content, unless it is from a file
+            if self.rule_source == '':
+                args[-1] = args[-1].lstrip()
+
             if not self.is_sequenced:
+                self.lines.insert(0, args.pop())
                 self.add_rule(*args)
             elif self.rules:
                 _, _, _, _, _, _, location, value = args
@@ -348,21 +576,40 @@ class ResponseParser:
             return False
 
         if self.is_sequenced:
+            #self.rules[-1].headers.append([])
             self.rules[-1].location.append([])
             self.rules[-1].values.append([])
         else:
             if not self.rules:
-                self.add_rule(None, None, None, None, None, None, 'text', '')
+                self.add_rule(None, None, None, None, None, None, 'text')
             self.rules[-1].location.clear()
             self.rules[-1].location.append([])
-            self.rules[-1].values.clear()  # TODO warn if we are tossing away content
-            self.rules[-1].values.append([])
+            self.rules[-1].headers.clear() # TODO not necessary, I think
+            self.rules[-1].headers.append({}) # TODO not necessary, I think
+            #self.rules[-1].values.clear()  # TODO warn if we are tossing away content
+            #self.rules[-1].values.append([])
             self.is_sequenced = True
 
         if len(m.group(2)) > 0:
             self.lines.insert(0, m.group(2))
 
         return True
+
+    def is_matching_header_content(self, line):
+        m = re.match(r'\s*HEADER:\s*(.+)\s*:\s*(.*)', line)
+        if not m:
+            is_matching = False
+        elif not self.currently_processing_a_text_rule():
+            self.add_rule(None, None, None, None, None, None, 'text')
+            #self.rules[-1].values.clear()
+            #self.rules[-1].values.append([])
+            is_matching = True
+        else:
+            is_matching = len(self.rules[-1].values[-1]) == 0
+
+        if is_matching:
+            self.rules[-1].headers[-1][m.group(1)] = m.group(2)
+        return is_matching
 
     def is_matching_header_rule(self, line):
         return self.add_if_match(line,
@@ -402,48 +649,48 @@ class ResponseParser:
             reset_sequence=False)
 
 
-class RulesAdjuster:
-
-    # eg: HEADER: Accept: compressed
-    header_line_pat = re.compile(r'\s*HEADER:\s*(.+)\s*:\s*(.*)')
-
-    def __init__(self, is_from_file, rules):
-        self.is_from_file = is_from_file
-        self.rules = rules
-
-    def adjust(self):
-        for rule in self.rules:
-            self.adjust_rule(rule)
-
-    def adjust_rule(self, rule):
-        values = rule.values.copy()
-        rule.values.clear()
-        rule.headers.clear() # it should already be empty
-
-        for lines in values:
-            self.adjust_rule_content(lines, rule)
-
-    def adjust_rule_content(self, lines, rule):
-        headers = {}
-
-        # move headers from value to headers field
-        while lines and self.rule_content_begins_with_header(lines, headers):
-            pass
-
-        # remove whitespace before first line of content, unless it is from a file
-        if lines and not self.is_from_file:
-            lines[0] = lines[0].lstrip()
-
-        rule.values.append(lines)
-        rule.headers.append(headers)
-
-    def rule_content_begins_with_header(self, lines, headers):
-        m = re.match(self.header_line_pat, lines[0])
-        if m:
-            headers[m.group(1)] = m.group(2)
-            lines.pop(0)
-            return True
-        return False
+# class RulesAdjuster:
+#
+#     # eg: HEADER: Accept: compressed
+#     header_line_pat = re.compile(r'\s*HEADER:\s*(.+)\s*:\s*(.*)')
+#
+#     def __init__(self, is_from_file, rules):
+#         self.is_from_file = is_from_file
+#         self.rules = rules
+#
+#     def adjust(self):
+#         for rule in self.rules:
+#             self.adjust_rule(rule)
+#
+#     def adjust_rule(self, rule):
+#         values = rule.values.copy()
+#         rule.values.clear()
+#         rule.headers.clear() # it should already be empty
+#
+#         for lines in values:
+#             self.adjust_rule_content(lines, rule)
+#
+#     def adjust_rule_content(self, lines, rule):
+#         headers = {}
+#
+#         # move headers from value to headers field
+#         while lines and self.rule_content_begins_with_header(lines, headers):
+#             pass
+#
+#         # remove whitespace before first line of content, unless it is from a file
+#         if lines and not self.is_from_file:
+#             lines[0] = lines[0].lstrip()
+#
+#         rule.values.append(lines)
+#         rule.headers.append(headers)
+#
+#     def rule_content_begins_with_header(self, lines, headers):
+#         m = re.match(self.header_line_pat, lines[0])
+#         if m:
+#             headers[m.group(1)] = m.group(2)
+#             lines.pop(0)
+#             return True
+#         return False
 
 
 class RulesTemplate:

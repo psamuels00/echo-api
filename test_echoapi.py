@@ -874,7 +874,7 @@ class TestMultipleResponses(TestEchoServer):
                  file:test/no_match.echo
                  no match again'''
         self.case(url, 200, 'no matches\n')
-        self.case(url, 200, '                 no match again')
+        self.case(url, 200, 'no match again')
 
 
 class TestAfterOption(TestEchoServer):
