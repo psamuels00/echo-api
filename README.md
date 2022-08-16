@@ -130,7 +130,7 @@ To echo back the name of a "color" parameter, for example:
 Recognize multiple, named parameters in the url path and render them in the response.
 For example:
 
-    http://127.0.0.1:5000/id:{id}/lab:{lab}?_echo_response=200 { "id": {id}, "lab": "{lab}" }
+    http://127.0.0.1:5000/id:999/lab:the_lab?_echo_response=200 { "id": {id}, "lab": "{lab}" }
 
 
 ## Response Files
@@ -461,7 +461,7 @@ For example:
         %23 comment before rules
         PARAM:name  /bob/  file:samples/get/bob.json
         %23 another comment
-        PARAM:name  /sue/  file:samples/get/sue.json"
+        PARAM:name  /sue/  file:samples/get/sue.json
 
 
 ## Newline Markers
@@ -482,6 +482,55 @@ They may also be included to add visual appeal, if you're into that.  For exampl
     | PATH: /delete/ text: error
     | PARAM:dog /fido|spot/ text: Hi {dog}
     | text: OK
+
+
+## Orthogonality
+
+If the rules specification were fully orthogonal, we would be able to include selection criteria and
+additional options on individual content element parts of a sequence rule.  For example:
+
+    201 HEADER: X-num-elem=5
+    PARAM:name /.../ 422 after=200ms
+        HEADER: X-num-elem=0
+        You have an error.
+    PARAM:name /.../ 200
+        Everything is ok.
+    JSON:name.name /.../
+        HEADER: X-num-elem=1
+        The element was created.
+    PATH: /.../
+        --[ 1 ]--
+        PARAM:name /.../ file:filename.echo
+        PARAM:name /.../ file:filename.echo
+        JSON:name.name /.../ content
+        --[ 2 ]--
+        200 text:content
+        --[ 3 ]--
+        500 delay=5000ms file:fatal.echo
+
+We cannot do this, but we can achieve the same effect by placing each content element in a separate file.
+For example, let's say we have a file named seq1.echo with the following content:
+
+    PARAM:name /.../ file:filename.echo
+    PARAM:name /.../ file:filename.echo
+    JSON:name.name /.../ content
+
+... a file named seq2.echo with the following content:
+
+    200 text:content
+
+...and a file named seq3.echo with the following content:
+
+    500 delay=5000ms file:fatal.echo
+
+Using these files, the final rule above becomes:
+
+    PATH: /.../
+        --[ 1 ]-- file:seq1.echo
+        --[ 2 ]-- file:seq2.echo
+        --[ 3 ]-- file:seq3.echo
+
+...and all the selection criteria and additional options in the seq?.echo files are recognized.
 
 
 ## Server Commands
@@ -508,19 +557,170 @@ List the rules.  For debugging only.
 ## TODO
 
 - change file: to FILE: and text: to TEXT:
-- split into separate files
+- split source into separate files
 - version manage the rules specification format
 - add support for an http location in addition to file and text
+- add option to log, and return in a header, the rule that was matched, if any, and the sequence number
+- add option to break out of text content, like @@@EndRule
 - add error checking *everywhere* (including cirular file references), and add unit tests for each condition
 
 
 ## TODO maybe
 
-- add support for use as a library in addition to use as a service
+- add more support for use as a library in addition to use as a service
 - add option for a user id (eg: _echo_user=psamuels/healthalgo-tracking-api) to set up a shared echo server
 - optimize by cacheing file contents as unresolved templates (and maybe the resolved instances too??)
 - optimize by precompiling all the static regular expressions, like EchoServer.param_pat
 - allow newlines anywhere in a rule (after selector type, selector target, pattern, status code, delay, or location)
+- add rule selection capability based on a param or JSON field *not* supplied
+- add support for logical combinations of selection criteria
+  eg: OR PARAM:name /.../ AND PARAM:name /.../ JSON:name /.../
 - add wildcard support for parameters and JSON fields (ie: "PARAM:\*" and "JSON:\*")
 - check for security of allowing any expression in the content which will be evaluated via str.format()
-- For more useful semantics of the sequenced content, perhaps the rule ID should be based on the path of nested file refs leading to the rule rather than just the name of the file containing the rule.  This would allow a file to be reused in multiple rules with the same selection criteria, but having been reached through a different path through the rules spec.  Not sure if this is needed.
+- For more useful semantics of the sequenced content, perhaps the rule ID should be based on the path of nested file refs leading to the rule rather than just the name of the file containing the rule.  This would allow a file to be reused in multiple rules with the same selection criteria, but having been reached through a different path through the rules spec.  Not sure if this is preferred.
+
+
+
+## Design Documentation: State Machine
+
+***Some parts of this may have been anticipatory, pending completion of the
+ambitious_attempt_to_improve_orthogonality branch.***
+
+
+### Definitions
+- Simple Rule: A rule with a single content value.
+- Sequence Rule: A rule with multiple content sections (sequenced content).
+- Content: The part of a rule that is echoed back to the client.
+- Content Element: One of the content sections of a sequence rule.
+
+### States
+- INIT: Initial state, prior to any global options or rules.
+- GLOBAL: We are parsing global options.
+- RULE: We are parsing a simple rule, prior to parsing the content of the rule.
+- CONTENT: We are parsing the content of a simple rule.
+- SEQ: We are parsing a sequence rule, prior to parsing one of the content elements.
+- SEQ_CONTENT: We are parsing one of the content elements of a sequence rule.
+
+### Transitions
+
+#### Options
+On the following input...
+
+- 999
+- delay=99ms
+- after=99ms
+- HEADER: name=value$
+
+...do this:
+
+    if state is INIT or GLOBAL
+        save option in global scope
+        if state is INIT
+            set state to GLOBAL
+    elif state is RULE or SEQ
+        save option in rule scope
+    else (state is CONTENT or SEQ_CONTENT)
+        input is read as part of content
+    
+#### Rule
+On the following input...
+
+- ^HEADER: name /.../
+- ^PARAM: name /.../
+- ^JSON: name /.../
+- ^PATH: /.../
+- ^BODY: /.../
+
+...do this:
+
+    if state is INIT or GLOBAL
+        save selection criteria for the next rule
+        set state to RULE
+    else (state is RULE, CONTENT, SEQ, or SEQ_CONTENT)
+        finish creating the current rule
+        save selection criteria for the next rule
+        set state to RULE
+
+#### File Content
+On the following input...
+
+- file: filename$
+
+...do this:
+
+    if state is INIT or GLOBAL
+        create a file rule based on the input
+        set state to RULE
+    elif state is RULE
+        finish creating the current rule as a file rule
+    elif state is CONTENT
+        if match "file:" at beginning of line
+            finish creating the current rule as a text rule
+            create a file rule based on the input
+            set state to RULE
+        else
+            add input to the content of the current text rule
+    elif state is SEQ
+        create a file rule based on the input and add it to the list for the current content element
+    else (state is SEQ_CONTENT)
+        finish creating the current rule as a text rule
+        create a file rule based on the input and add it to the list for the current content element
+        
+#### Text Content
+On the following input...
+
+- text: content...
+- content...
+
+...do this:
+
+    if state is INIT or GLOBAL
+        start a text rule based on the input
+        set state to RULE
+    elif state is RULE
+        make the current rule a text rule and add initial content
+        set state to CONTENT
+    elif state is CONTENT
+        add to the content of the current text rule
+    elif state is SEQ
+        add input to the current content element
+        set state to SEQ_CONTENT
+    else (state is SEQ_CONTENT)
+        add input to the current content element
+        
+#### End Element
+On the following input...
+
+--
+
+...do this:
+
+    if state is INIT or GLOBAL
+        set state to RULE
+    elif state is RULE or SEQ
+        set state to CONTENT
+    else (state is CONTENT or SEQ_CONTENT)
+        input is read as part of content
+
+#### Content Element
+On the following input...
+
+- --[ nn ]--
+
+...do this:
+
+    if state is INIT or GLOBAL
+        start a sequence rule with an initial, empty content element
+        set state to SEQ
+    elif state is RULE
+        make the current rule a sequence rule with an initial, empty content element
+        set state to SEQ
+    elif state is CONTENT
+        if there is already some content in a text rule
+            warn that it will be lost, or maybe prepend it to all content elements
+        make the current rule a sequence rule with an initial, empty content element
+        set state to SEQ
+    else (state is SEQ or SEQ_CONTENT)
+        finish the current content element
+        add a new, empty content element to the current sequence rule
+        
