@@ -18,12 +18,6 @@ class EchoServer:
         self.parse_response_parameter()
         self.parse_json_body()
 
-        # self.content = None
-        # self.headers = None
-        # self.json = None
-        # self.path = None
-        # self.path_params = None
-
     def parse_headers(self):
         self.headers = None  # Box of request headers
         headers = {}
