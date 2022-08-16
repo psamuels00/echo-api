@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from box import Box
-from echoapi import RulesTemplate
+from echoapi.rules_template import RulesTemplate
 
 import requests
 import sys
