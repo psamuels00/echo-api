@@ -580,7 +580,6 @@ List the rules.  For debugging only.
 ## TODO
 
 - change file: to FILE: and text: to TEXT:
-- split source into separate files
 - version manage the rules specification format
 - add support for an http location in addition to file and text
 - add option to log, and return in a header, the rule that was matched, if any, and the sequence number
