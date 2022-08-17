@@ -5,7 +5,6 @@ import re
 
 
 class RulesTemplate:
-
     def __init__(self, request_path="", text=""):
         self.request_path = request_path
         self.text = text
@@ -51,7 +50,8 @@ class RulesTemplate:
             return default_delay, default_status_code, {}, text
         text = self.resolve_value(text, headers, params, json)
         return self.select_content(
-            file, text, default_status_code, default_delay, default_after, headers, params, json, level)
+            file, text, default_status_code, default_delay, default_after, headers, params, json, level
+        )
 
     def select_content(
         self, rule_source, text, default_status_code, default_delay, default_after, headers, params, json, level=0
@@ -88,6 +88,7 @@ class RulesTemplate:
             if rule.location == "file":
                 file = content.strip()
                 delay, status, headers, content = self.resolve_file(
-                    file, status, delay, after, headers, params, json, level + 1)
+                    file, status, delay, after, headers, params, json, level + 1
+                )
 
         return delay, status, headers, content

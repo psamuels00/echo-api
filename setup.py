@@ -11,14 +11,12 @@ setup(
     author="Perrin Samuels",
     author_email="perrin.samuels@gmail.com",
     python_requires=">=3.7.3",
-
     # external packages as dependencies
     install_requires=[
         "flask == 2.2.2",
         "python-box == 6.0.2",
         "requests == 2.28.1",
     ],
-
     # for testing only
     extras_require={
         "test": [

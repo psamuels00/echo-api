@@ -14,7 +14,7 @@ def all_routes(text):
     server = EchoServer(text)
     delay, resp = server.response()
     if delay:
-        time.sleep(delay/1000)
+        time.sleep(delay / 1000)
     return resp
 
 

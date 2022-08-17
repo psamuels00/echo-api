@@ -26,8 +26,8 @@ class EchoServer:
         self.headers = Box(headers)
 
     def parse_request_path(self, path):
-        self.path = path         # the request path
-        self.path_params = {}    # params parsed from path
+        self.path = path  # the request path
+        self.path_params = {}  # params parsed from path
 
         parts = path.split("/")
         for part in parts:
@@ -51,13 +51,8 @@ class EchoServer:
         self.json = Box(json)
 
     def all_params(self):
-        params = {
-            k: v for k, v in request.args.items()
-        }
-        return {
-            **self.path_params,
-            **params
-        }
+        params = {k: v for k, v in request.args.items()}
+        return {**self.path_params, **params}
 
     def response(self):
         content = self.content

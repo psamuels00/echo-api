@@ -17,11 +17,11 @@ class ResponseParser:
         """
         self.rule_source = rule_source  # will not change
         self.status_code = status_code  # will be updated if rule-specific value is parsed
-        self.delay = delay              # will be updated if rule-specific value is parsed
-        self.after = after              # will be updated if rule-specific value is parsed
-        self.lines = None               # used by parse() to support parsing elements at beginning of line
-        self.is_sequenced = False       # used by parse() to know if text is part of sequenced content
-        self.rules = []                 # returned by parse(), this is the primary product of parsing
+        self.delay = delay  # will be updated if rule-specific value is parsed
+        self.after = after  # will be updated if rule-specific value is parsed
+        self.lines = None  # used by parse() to support parsing elements at beginning of line
+        self.is_sequenced = False  # used by parse() to know if text is part of sequenced content
+        self.rules = []  # returned by parse(), this is the primary product of parsing
         self.global_scope = True
 
     def parse(self, text):
@@ -102,10 +102,12 @@ class ResponseParser:
             self.global_scope = False
 
     def currently_processing_a_text_rule(self):
-        return self.rules \
-            and len(self.rules[-1].location) \
-            and len(self.rules[-1].location[-1]) \
+        return (
+            self.rules
+            and len(self.rules[-1].location)
+            and len(self.rules[-1].location[-1])
             and self.rules[-1].location[-1][-1] == "text"
+        )
 
     def add_rule(self, selector_type, selector_target, pattern, status_code, delay, after, location, value):
         rule_source = self.rule_source
@@ -113,23 +115,24 @@ class ResponseParser:
         status_code = self.status_code if status_code is None else int(status_code)
         delay = self.delay if delay is None else int(delay)
         after = self.after if after is None else int(after)
-        location = [ [location or "text"] ] # a list to support sequenced content
-        headers = [] # RulesAdjuster moves entries from values to headers, a list to support sequenced content
-        content = [value] # content is stored as a list of values, here initialized with the first value
-        values = [content] # to support sequenced content, we wrap the first content value in a list
+        location = [[location or "text"]]  # a list to support sequenced content
+        headers = []  # RulesAdjuster moves entries from values to headers, a list to support sequenced content
+        content = [value]  # content is stored as a list of values, here initialized with the first value
+        values = [content]  # to support sequenced content, we wrap the first content value in a list
 
         rule = Rule(
-            rule_source,      # file that rule comes from, or "" if directly from _echo_response param value
-            after,            # integer representing milliseconds
-            selector_type,    # one of { PATH, PARAM, JSON, BODY, None }
+            rule_source,  # file that rule comes from, or "" if directly from _echo_response param value
+            after,  # integer representing milliseconds
+            selector_type,  # one of { PATH, PARAM, JSON, BODY, None }
             selector_target,  # eg: id, or sample.location.name
-            pattern,          # any regular expression
-            status_code,      # integer HTTP response code
-            delay,            # integer representing milliseconds
-            location,         # a list of values, each one of { text, file }
-            headers,          # dictionary of header values for multiple response content
-            values)           # arbitrary text, may include multiple response content values
-                              # if location is file, then the text will be the file path
+            pattern,  # any regular expression
+            status_code,  # integer HTTP response code
+            delay,  # integer representing milliseconds
+            location,  # a list of values, each one of { text, file }
+            headers,  # dictionary of header values for multiple response content
+            values,
+        )  # arbitrary text, may include multiple response content values
+        # if location is file, then the text will be the file path
         self.rules.append(rule)
 
     def add_if_match(self, line, pattern, groups, reset_sequence=True):
@@ -138,8 +141,7 @@ class ResponseParser:
             if reset_sequence:
                 self.is_sequenced = False
 
-            args = [ m.group(n) if n else None
-                     for n in groups ]
+            args = [m.group(n) if n else None for n in groups]
 
             if not self.is_sequenced:
                 self.add_rule(*args)
@@ -216,6 +218,8 @@ class ResponseParser:
 
         return True
 
+    # fmt: off
+
     def is_matching_header_rule(self, line):
         return self.add_if_match(line,
             r"\s*(HEADER):\s*(.+?)\s*(!?/.*?/i?)\s*((\d{3})\b\s*)?(delay=(\d+)ms\s*)?(after=(\d+)ms\s*)?((text|file):)?\s*(.*)",
@@ -252,3 +256,5 @@ class ResponseParser:
             r"(\s*(\d{3})\b)?(\s*delay=(\d+)ms)?(\s*after=(\d+)ms)?(.*)",
             (0,0,0,2,                  4,                 6,    0, 7   ),
             reset_sequence=False)
+
+    # fmt: on
