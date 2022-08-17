@@ -1,4 +1,4 @@
-flask
-pytest
-python-box
-requests
+flask==2.2.2
+pytest==7.1.2
+python-box==6.0.2
+requests==2.28.1
