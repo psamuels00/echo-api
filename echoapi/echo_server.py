@@ -8,11 +8,11 @@ import re
 
 class EchoServer:
 
-    param_pat = re.compile(r'^(\w+):(.*)$')
-    param_value_pat = re.compile(r':\w+')
+    param_pat = re.compile(r"^(\w+):(.*)$")
+    param_value_pat = re.compile(r":\w+")
 
     def __init__(self, path):
-        self.request_path = re.sub(self.param_value_pat, '', path)
+        self.request_path = re.sub(self.param_value_pat, "", path)
         self.parse_headers()
         self.parse_request_path(path)
         self.parse_response_parameter()
@@ -29,7 +29,7 @@ class EchoServer:
         self.path = path         # the request path
         self.path_params = {}    # params parsed from path
 
-        parts = path.split('/')
+        parts = path.split("/")
         for part in parts:
             m = self.param_pat.search(part)
             if m:
@@ -37,7 +37,7 @@ class EchoServer:
                 self.path_params[name] = content
 
     def parse_response_parameter(self):
-        echo_response = request.args.get('_echo_response', '')
+        echo_response = request.args.get("_echo_response", "")
         self.content = echo_response.lstrip()
 
     def parse_json_body(self):

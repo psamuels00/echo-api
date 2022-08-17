@@ -27,16 +27,16 @@ class Rules:
     def matches(text, rule_pattern):
         # set case-sensitive flag
         flags = 0
-        if rule_pattern[-1] == 'i':
+        if rule_pattern[-1] == "i":
             flags = re.IGNORECASE
 
         # determine match polarity
         is_positive = True
-        if rule_pattern[0] == '!':
+        if rule_pattern[0] == "!":
             is_positive = False
 
         # parse pattern text from pattern spec, eg: parse "dog" from "!/dog/i"
-        pattern = re.sub(r'.*/(.*)/.*', r'\1', rule_pattern)
+        pattern = re.sub(r".*/(.*)/.*", r"\1", rule_pattern)
 
         got_match = False
         text_match = re.search(pattern, text, flags)
@@ -62,23 +62,23 @@ class Rules:
                 apply_rule = True
             else:
                 text = None
-                if rule.selector_type == 'HEADER':
+                if rule.selector_type == "HEADER":
                     header_name = rule.selector_target
-                    text = headers.get(header_name, '')
+                    text = headers.get(header_name, "")
 
-                elif rule.selector_type == 'PATH':
+                elif rule.selector_type == "PATH":
                     text = request.path
 
-                elif rule.selector_type == 'PARAM':
+                elif rule.selector_type == "PARAM":
                     param_name = rule.selector_target
-                    text = params.get(param_name, '')
+                    text = params.get(param_name, "")
 
-                elif rule.selector_type == 'JSON':
+                elif rule.selector_type == "JSON":
                     json_path = rule.selector_target
-                    fmt = '{json.' + json_path + '}'
+                    fmt = "{json." + json_path + "}"
                     text = fmt.format(json=json)
 
-                elif rule.selector_type == 'BODY':
+                elif rule.selector_type == "BODY":
                     body = request.get_data().decode()
                     text = body
 

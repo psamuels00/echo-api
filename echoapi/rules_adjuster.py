@@ -4,7 +4,7 @@ import re
 class RulesAdjuster:
 
     # eg: HEADER: Accept: compressed
-    header_line_pat = re.compile(r'\s*HEADER:\s*(.+)\s*:\s*(.*)')
+    header_line_pat = re.compile(r"\s*HEADER:\s*(.+)\s*:\s*(.*)")
 
     def __init__(self, is_from_file, rules):
         self.is_from_file = is_from_file

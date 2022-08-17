@@ -3,7 +3,7 @@ import typing
 
 class Rule(typing.NamedTuple):
 
-    rule_source: str       # '' if directly from _echo_response, or name of file otherwise
+    rule_source: str       # "" if directly from _echo_response, or name of file otherwise
     after: int             # eg: 200, represents number of milliseconds after start/reset of echo server
     selector_type: str     # one of { PATH, HEADER, PARAM, JSON, BODY }
     selector_target: str   # name of header, parameter, or json field
@@ -16,10 +16,10 @@ class Rule(typing.NamedTuple):
 
     def unique_id(self, request_path):
         after = str(self.after or 0)
-        selector_type = '' if self.selector_type is None else self.selector_type
-        selector_target = '' if self.selector_target is None else self.selector_target
-        pattern = '' if self.pattern is None else self.pattern
-        return ':'.join((request_path, self.rule_source, selector_type, selector_target, pattern, after))
+        selector_type = "" if self.selector_type is None else self.selector_type
+        selector_target = "" if self.selector_target is None else self.selector_target
+        pattern = "" if self.pattern is None else self.pattern
+        return ":".join((request_path, self.rule_source, selector_type, selector_target, pattern, after))
 
     def rule4location(self, location, headers, values):
         return Rule(
@@ -40,7 +40,7 @@ class Rule(typing.NamedTuple):
         values = self.values[offset]
 
         rules = []
-        while locations and locations[0] == 'file':
+        while locations and locations[0] == "file":
             headers = self.headers[offset]
             rule = self.rule4location(locations.pop(0), headers, values.pop(0))
             rules.append(rule)
