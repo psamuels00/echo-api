@@ -22,7 +22,7 @@ cd echo-api
 # set up Python virtual environment
 pyenv virtualenv 3.7.3 echo-api
 pyenv local echo-api
-pip install -r requirements.txt
+pip install . .[test]
 
 # start server
 ./server-run-dev.sh
@@ -35,27 +35,49 @@ curl http://127.0.0.1:5000/?_echo_response=red.green.blue; echo
 
 # stop server
 ^C
+
+# cleanup
+rm -rf build src/echo_api.egg-info
+
+# to really clean up
+pip uninstall echo-api -y
+pip freeze | xargs pip uninstall -y
 ```
 
 ## Usage in Docker
 
 ```
-# start server
-docker build -t echo-api .
-container_id=`docker run -dp 5000:5000 echo-api`
-echo "container_id=${container_id:0:10}"
-docker logs -f $container_id
+start_server() {
+    docker build -t echo-api .
+    container_id=`docker run -dp 5000:5000 echo-api`
+    echo "container_id=${container_id:0:10}" > .container_id
+    docker logs -f $container_id
+}
 
-# run tests
-docker exec $container_id pytest
+run_tests() {
+    pytest
+}
 
-# use the service
-curl http://127.0.0.1:5000/?_echo_response=red.green.blue.from.Docker; echo
+run_tests_in_container() {
+    eval `cat .container_id`
+    docker exec $container_id pytest
+}
 
-# stop server
-docker stop $container_id
-docker rm $container_id
-docker rmi echo-api
+use_service() {
+    curl http://127.0.0.1:5000/?_echo_response=red.green.blue.from.Docker; echo
+}
+stop_server() {
+    eval `cat .container_id`
+    docker stop $container_id
+    docker rm $container_id
+    docker rmi echo-api
+}
+
+start_server
+run_tests
+run_tests_in_container
+use_service
+stop_server
 ```
 
 ## URL Encoding
