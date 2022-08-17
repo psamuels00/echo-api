@@ -43,6 +43,7 @@ curl http://127.0.0.1:5000/?_echo_response=red.green.blue; echo
 # start server
 docker build -t echo-api .
 container_id=`docker run -dp 5000:5000 echo-api`
+echo "container_id=${container_id:0:10}"
 docker logs -f $container_id
 
 # run tests
