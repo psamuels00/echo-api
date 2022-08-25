@@ -1,3 +1,6 @@
+from flask import request
+
+import re
 import typing
 
 
@@ -51,3 +54,64 @@ class Rule(typing.NamedTuple):
             rules.append(rule)
 
         return rules
+
+    def _text(self, headers, params, json):
+        value = None
+
+        if self.selector_type == "HEADER":
+            header_name = self.selector_target
+            value = headers.get(header_name, "")
+
+        elif self.selector_type == "PATH":
+            value = request.path
+
+        elif self.selector_type == "PARAM":
+            param_name = self.selector_target
+            value = params.get(param_name, "")
+
+        elif self.selector_type == "JSON":
+            json_path = self.selector_target
+            fmt = "{json." + json_path + "}"
+            value = fmt.format(json=json)
+
+        elif self.selector_type == "BODY":
+            body = request.get_data().decode()
+            value = body
+
+        return value
+
+    def _matches(self, text):
+        # set case-sensitive flag
+        flags = 0
+        if self.pattern[-1] == "i":
+            flags = re.IGNORECASE
+
+        # determine match polarity
+        is_positive = True
+        if self.pattern[0] == "!":
+            is_positive = False
+
+        # parse pattern text from pattern spec, eg: parse "dog" from "!/dog/i"
+        pattern = re.sub(r".*/(.*)/.*", r"\1", self.pattern)
+
+        got_match = False
+        text_match = re.search(pattern, text, flags)
+        if is_positive and text_match:
+            got_match = True
+        elif not is_positive and not text_match:
+            got_match = True
+
+        return got_match
+
+    def apply(self, headers, params, json, millis_since_reset):
+        if self.selector_type is None:
+            value = True
+        else:
+            text = self._text(headers, params, json)
+            value = self._matches(text)
+
+        if millis_since_reset <= int(self.after or 0):
+            value = False
+
+        return value
+

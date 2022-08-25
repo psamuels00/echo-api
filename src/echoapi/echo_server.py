@@ -12,7 +12,6 @@ class EchoServer:
     param_value_pat = re.compile(r":\w+")
 
     def __init__(self, path):
-        self.request_path = re.sub(self.param_value_pat, "", path)
         self.parse_headers()
         self.parse_request_path(path)
         self.parse_response_parameter()
@@ -33,8 +32,8 @@ class EchoServer:
         for part in parts:
             m = self.param_pat.search(part)
             if m:
-                name, content = m.group(1), m.group(2)
-                self.path_params[name] = content
+                name, value = m.group(1), m.group(2)
+                self.path_params[name] = value
 
     def parse_response_parameter(self):
         echo_response = request.args.get("_echo_response", "")
@@ -60,7 +59,8 @@ class EchoServer:
         params = self.all_params()
         json = self.json
 
-        template = RulesTemplate(self.request_path, content)
+        request_path = re.sub(self.param_value_pat, "", self.path)
+        template = RulesTemplate(request_path, content)
         delay, status, headers, content = template.resolve(headers, params, json)
         resp = Response(content, headers=headers, status=status)
 

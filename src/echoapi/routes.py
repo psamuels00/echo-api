@@ -1,4 +1,7 @@
-from .rules import Rules
+from .rules import (
+    reset as rules_reset,
+    rule_match_count,
+)
 from .echo_server import EchoServer
 
 from flask import Flask
@@ -25,15 +28,14 @@ def root_path():
 
 @app.route("/_echo_reset", methods=["GET"])
 def reset():
-    Rules.last_reset_time_in_millis = Rules.current_time_in_millis()
-    Rules.rule_match_count.clear()
+    rules_reset()
     return "ok"
 
 
 @app.route("/_echo_list_rules", methods=["GET"])
 def list_rules():  # for debugging
-    keys = Rules.rule_match_count.keys()
+    keys = rule_match_count.keys()
     for k in sorted(keys):
-        v = Rules.rule_match_count[k]
+        v = rule_match_count[k]
         print(f"RULE: {v:5} {k}")
     return "ok"
