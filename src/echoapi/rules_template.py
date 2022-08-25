@@ -1,7 +1,23 @@
+# import string
+
 from .rules import Rules
 
 import os
 import re
+
+
+# allow_undefined_param_refs = True
+#
+#
+# class ForgivingFormat(string.Formatter):
+#     """Format string, allowing missing field references"""
+#
+#     def get_field(self, field_name, args, kwargs):
+#         try:
+#             val = super().get_field(field_name, args, kwargs)
+#         except KeyError as e:
+#             val = ("", field_name)
+#         return val
 
 
 class RulesTemplate:
@@ -11,24 +27,22 @@ class RulesTemplate:
 
     @staticmethod
     def resolve_value(value, headers, params, json):
-        def double_braces(string):
-            string = re.sub(r"{([^\w])", r"{{\1", string)  # "{" not followed by word char is converted to "{{"
-            string = re.sub(r"([^\w])}", r"\1}}", string)  # "}" not preceded by word char is converted to "}}"
-            return string
+        def resolve_reference(match_obj):
+            ref = match_obj.group(1)
+            try:
+                if ref.startswith("json."):
+                    fmt = "{" + ref + "}"
+                    return fmt.format(json=json)
 
-        def single_braces(string):
-            string = re.sub(r"{{([^\w])", r"{\1", string)  # "{{" not followed by word char is converted to "{"
-            string = re.sub(r"([^\w])}}", r"\1}", string)  # "}}" not preceded by word char is converted to "}"
-            return string
+                elif ref.startswith("header."):
+                    key = ref[7:].title()
+                    return headers[key]
+                else:
+                    return params[ref]
+            except Exception:
+                return ""
 
-        if headers or params or json:
-            p = params.copy()
-            p["json"] = json
-            p["header"] = headers
-            value = double_braces(value)
-            value = value.format(**p)
-            value = single_braces(value)
-        return value
+        return re.sub(r"{(\w*([.-]\w*)*)}", resolve_reference, value)
 
     @staticmethod
     def load_file(file):
@@ -42,7 +56,7 @@ class RulesTemplate:
         default_delay = 0
         default_after = 0
         text = self.resolve_value(self.text, headers, params, json)
-        return self.select_content("", text, default_status_code, default_delay, default_after, headers, params, json)
+        return self.select_content("", default_status_code, default_delay, default_after, text, headers, params, json)
 
     def resolve_file(self, file, default_status_code, default_delay, default_after, headers, params, json, level):
         text = self.load_file(file)
@@ -50,13 +64,13 @@ class RulesTemplate:
             return default_delay, default_status_code, {}, text
         text = self.resolve_value(text, headers, params, json)
         return self.select_content(
-            file, text, default_status_code, default_delay, default_after, headers, params, json, level
+            file, default_status_code, default_delay, default_after, text, headers, params, json, level
         )
 
     def select_content(
-        self, rule_source, text, default_status_code, default_delay, default_after, headers, params, json, level=0
+        self, rule_source, default_status_code, default_delay, default_after, text, headers, params, json, level=0
     ):
-        rules = Rules(self.request_path, rule_source, text, default_status_code, default_delay, default_after)
+        rules = Rules(self.request_path, rule_source, default_status_code, default_delay, default_after, text)
         rule_selector = rules.rule_selector_generator(headers, params, json)
 
         delay = rules.delay

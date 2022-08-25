@@ -718,7 +718,7 @@ class TestHeaderInResponseContent(TestEchoServer):
     def test_include_header_with_punctuation_in_response(self):
         self.case(
             '''http://127.0.0.1:5000/hdr?_echo_response=200
-                     The "team" header is "{header.Content_Type}"''',
+                     The "team" header is "{header.Content-Type}"''',
             200,
             'The "team" header is "application/json"',
         )

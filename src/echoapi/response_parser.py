@@ -13,7 +13,9 @@ class ResponseParser:
         :param status_code:
             default status code (global default, inherited, or preceding any rules)
         :param delay:
-            default status code (global default, inherited, or preceding any rules)
+            default delay (global default, inherited, or preceding any rules)
+        :param after:
+            default after (global default, inherited, or preceding any rules)
         """
         self.rule_source = rule_source  # will not change
         self.status_code = status_code  # will be updated if rule-specific value is parsed
